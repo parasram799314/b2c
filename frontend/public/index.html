@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Travel RFQ Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gold: { 50:'#fffbeb',100:'#fef3c7',200:'#fde68a',300:'#fcd34d',400:'#fbbf24',500:'#f5a623',600:'#d97706',700:'#b45309' }
+            },
+            fontFamily: { sans: ['DM Sans','system-ui','sans-serif'] }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <style>
+      *{font-family:'DM Sans',sans-serif;}body{background:#f8f9fb;}
+      ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
+      .rooms-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
+      input[type="date"]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer;}
+      .typing-dot{animation:tb 1s infinite;}.typing-dot:nth-child(2){animation-delay:.15s;}.typing-dot:nth-child(3){animation-delay:.3s;}
+      @keyframes tb{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+      @keyframes sil{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+      @keyframes fi{from{opacity:0}to{opacity:1}}
+      .asl{animation:sil .4s ease forwards;}.afi{animation:fi .3s ease forwards;}
+      .tab-active{background:#1a1a2e!important;color:white!important;}
+    </style>
+  </head>
+  <body><div id="root"></div></body>
+</html>
