@@ -23,9 +23,24 @@ function getImg(rfq) {
 }
 
 function getTitle(rfq) {
-  const dest   = rfq.destinations?.map(d => d.destination).filter(Boolean).join(' & ') || 'Trip';
+  const dest   = rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || 'Trip';
   const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || 0), 0) || 1;
-  return `${dest} ${nights + 1}-Day Tour`;
+  
+  // Handle both RFQ- and trip_ formats
+  let displayId = '';
+  if (rfq._id) {
+    if (rfq._id.startsWith('RFQ-')) {
+      displayId = rfq._id;
+    } else if (rfq._id.startsWith('trip_')) {
+      // Convert trip_ to RFQ format for display
+      const timestamp = rfq._id.replace('trip_', '');
+      displayId = 'RFQ-' + timestamp.toString(36).toUpperCase().slice(-6);
+    } else {
+      displayId = rfq._id;
+    }
+  }
+  
+  return `${displayId ? `${displayId} · ` : ''}${dest} ${nights + 1}-Day Tour`;
 }
 
 function getMeta(rfq) {
@@ -54,11 +69,13 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
     const saved = JSON.parse(localStorage.getItem('plan_' + rfq._id) || '[]');
     if (saved.length) {
       const hasPaid      = saved.some(p => p.status === 'paid');
-      const hasPending   = saved.some(p => !p.status || p.status === 'pending');
+      const hasPending   = saved.some(p => p.status === 'pending');
       const hasCancelled = saved.some(p => p.status === 'cancelled');
-      if (hasPaid && !hasPending)            planStatus = 'paid';
-      else if (hasPending)                   planStatus = 'pending';
-      else if (hasCancelled)                 planStatus = 'cancelled';
+      
+      // Priority: cancelled > pending > paid
+      if (hasCancelled)                         planStatus = 'cancelled';
+      else if (hasPending)                      planStatus = 'pending';
+      else if (hasPaid)                         planStatus = 'paid';
     }
   } catch {}
 
@@ -103,7 +120,7 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <div className="text-white font-bold text-sm leading-tight truncate">{title}</div>
           <div className="text-white/70 text-xs mt-0.5">
-            {rfq.guestCountry || 'India'} → {dest}
+            {rfq.guestCountry || 'India'} → {rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || dest}
           </div>
         </div>
       </div>

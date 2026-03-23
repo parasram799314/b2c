@@ -87,6 +87,14 @@ export default function HomePage({
   onDeleteItinerary,
   onAddToPlan,
 }) {
+  console.log('HomePage - Props received:', { 
+    itinerariesLength: itineraries.length, 
+    itineraries,
+    hasOnSubmit: !!onSubmit,
+    hasOnOpenItinerary: !!onOpenItinerary,
+    hasOnDeleteItinerary: !!onDeleteItinerary 
+  });
+  
   const [page, setPage]         = useState(1);
   const [showTpForm, setShowTpForm] = useState(false);
 
@@ -94,6 +102,14 @@ export default function HomePage({
   const totalPages   = Math.max(1, Math.ceil(itineraries.length / pageSize));
   const safePage     = Math.min(page, totalPages);
   const visibleItins = itineraries.slice((safePage - 1) * pageSize, safePage * pageSize);
+  
+  console.log('HomePage - Calculated values:', { 
+    pageSize, 
+    totalPages, 
+    safePage, 
+    visibleItinsLength: visibleItins.length,
+    visibleItins 
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-gray-900">
@@ -169,7 +185,11 @@ export default function HomePage({
 
       {/* ── ITINERARIES ── */}
       <main className="flex-1 bg-[#F9FAFB] mt-8">
-        {itineraries.length > 0 && (
+        {/* Debug Info */}
+        {console.log('HomePage - itineraries:', itineraries.length, itineraries)}
+        {console.log('HomePage - visibleItins:', visibleItins.length, visibleItins)}
+        
+        {itineraries.length > 0 ? (
           <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8" style={{ paddingBottom: '60px' }}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-bold text-lg text-gray-800" style={{ borderBottom: '2px solid #9e8240', paddingBottom: '8px' }}>Recent Itineraries</h2>
@@ -198,6 +218,14 @@ export default function HomePage({
                   className={`px-3 py-1.5 rounded-full border ${safePage === totalPages ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-500'}`}>Next</button>
               </div>
             )}
+          </section>
+        ) : (
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8" style={{ paddingBottom: '60px' }}>
+            <div className="text-center py-16">
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>No Itineraries Yet</h3>
+              <p style={{ fontSize: '14px', color: '#9ca3af' }}>Create your first trip to see it here!</p>
+            </div>
           </section>
         )}
       </main>

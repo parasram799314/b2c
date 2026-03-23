@@ -510,13 +510,13 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   const handleTripCreate = (aiMode=false) => {
     if(!canTrip) return;
     const rfq={
-      _id:'trip_'+Date.now(), from, depDate,
+      _id:rfqId, from, depDate,
       destinations:destinations.map(d=>({ destination:d.city, dateOfArrival:d.arrivalDate, nights:d.nights })),
       numberOfAdults:adults, numberOfChildren:children, numberOfInfants:infants,
       travelClass:tClass, travelType, budget, reviewer:tripReviewer, note,
       returnToBase, aiGenerate:aiMode, createdAt:new Date().toISOString(), status:'draft',
     };
-    onOpenDetail?.(rfq);
+    onSubmit?.(rfq);
     doCollapse();
   };
 

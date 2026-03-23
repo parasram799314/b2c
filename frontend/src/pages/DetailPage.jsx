@@ -55,6 +55,108 @@ const getResolvedDate = (item) => {
   return d;
 };
 
+// ─── getItemDestination ───────────────────────────────────────────────────────
+// Robustly figure out which destination an item belongs to
+function getItemDestination(item, destNames) {
+  const candidates = [
+    item.cityName,
+    item.destination,
+    item.toAirport,
+    item.to,
+    item.address,
+    item.name,
+  ].filter(Boolean).map(s => String(s).toLowerCase());
+
+  for (const dest of destNames) {
+    const dl = dest.toLowerCase();
+    if (candidates.some(c => c.includes(dl) || dl.includes(c))) return dest;
+  }
+
+  if (item.id) {
+    for (const dest of destNames) {
+      if (item.id.toLowerCase().includes(dest.toLowerCase())) return dest;
+    }
+  }
+
+  return null;
+}
+
+// ─── PermissionAvatars ────────────────────────────────────────────────────────
+// Dummy users — replace with real permission data from your backend
+const DUMMY_USERS = [
+  { initial: 'T', name: 'Trushant Shah', permission: 'Admin',    permBg: '#ede9fe', permColor: '#5b21b6', avatarBg: '#8b5cf6' },
+  { initial: 'R', name: 'Rahul Mehta',   permission: 'Can Edit', permBg: '#dbeafe', permColor: '#1e40af', avatarBg: '#0ea5e9' },
+  { initial: 'P', name: 'Priya Nair',    permission: 'View Only',permBg: '#d1fae5', permColor: '#065f46', avatarBg: '#f59e0b' },
+];
+
+function PermissionAvatars() {
+  const [openIdx, setOpenIdx] = useState(null);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpenIdx(null); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ display:'flex', alignItems:'center' }}>
+      {DUMMY_USERS.map((u, i) => (
+        <div
+          key={i}
+          style={{ position:'relative', zIndex: DUMMY_USERS.length - i }}
+          onMouseEnter={() => setOpenIdx(i)}
+          onMouseLeave={() => setOpenIdx(null)}
+          onClick={() => setOpenIdx(openIdx === i ? null : i)}
+        >
+          <div style={{
+            width:'26px', height:'26px', borderRadius:'50%',
+            background: u.avatarBg, color:'#fff',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'10px', fontWeight:700,
+            border:'2px solid #fff',
+            marginRight: i < DUMMY_USERS.length - 1 ? '-6px' : '0',
+            cursor:'pointer',
+            transition:'transform 0.15s',
+            transform: openIdx === i ? 'scale(1.18)' : 'scale(1)',
+            boxShadow: openIdx === i ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+            userSelect: 'none',
+          }}>
+            {u.initial}
+          </div>
+          {openIdx === i && (
+            <div style={{
+              position:'absolute', top:'32px', left:'50%', transform:'translateX(-50%)',
+              background:'#1f2937', color:'#fff',
+              borderRadius:'9px', padding:'8px 11px',
+              fontSize:'11px', whiteSpace:'nowrap',
+              zIndex:9999, pointerEvents:'none',
+              boxShadow:'0 4px 16px rgba(0,0,0,0.22)',
+            }}>
+              {/* Arrow */}
+              <div style={{
+                position:'absolute', top:'-5px', left:'50%', transform:'translateX(-50%)',
+                width:0, height:0,
+                borderLeft:'5px solid transparent', borderRight:'5px solid transparent',
+                borderBottom:'5px solid #1f2937',
+              }} />
+              <div style={{ fontWeight:700, fontSize:'11px', marginBottom:'5px', color:'#f9fafb' }}>{u.name}</div>
+              <span style={{
+                fontSize:'10px', fontWeight:600,
+                background: u.permBg, color: u.permColor,
+                padding:'2px 8px', borderRadius:'4px',
+                display:'inline-block',
+              }}>
+                {u.permission}
+              </span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── PTag ─────────────────────────────────────────────────────────────────────
 function PTag({ bg, color, children }) {
   return (
@@ -507,16 +609,42 @@ function EmptyState({ icon, message }) {
   );
 }
 
+// ─── Destination Dropdown Filter ──────────────────────────────────────────────
+function DestDropdown({ destinations, selected, onChange }) {
+  if (!destinations || destinations.length <= 1) return null;
+  return (
+    <select
+      value={selected}
+      onChange={e => onChange(e.target.value)}
+      style={{ padding:'6px 10px', border:'1px solid #e5e7eb', borderRadius:'8px', fontSize:'11px', fontWeight:600, color:'#374151', background:'#fff', cursor:'pointer', outline:'none', maxWidth:'160px' }}
+    >
+      <option value="">All Destinations</option>
+      {destinations.map((d, i) => <option key={i} value={d}>{d}</option>)}
+    </select>
+  );
+}
+
 // ─── FilteredView ─────────────────────────────────────────────────────────────
 function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planIds }) {
-  if (filter === 'flights') return <FlightsTab rfq={rfq} planItems={planItems} onAddToPlan={onAddToPlan} />;
+  const [selectedDest, setSelectedDest] = useState('');
+
+  const allDestNames = rfq.destinations?.map(d => d.destination).filter(Boolean) || [];
+
+  const filteredDestData = selectedDest
+    ? allDestData.filter(dd => dd.destination === selectedDest)
+    : allDestData;
+
+  if (filter === 'flights') return <FlightsTab rfq={rfq} planItems={planItems} onAddToPlan={onAddToPlan} selectedDest={selectedDest} />;
 
   if (filter === 'hotels') {
-    const has = allDestData.some(dd => dd.hotels?.length > 0);
+    const has = filteredDestData.some(dd => dd.hotels?.length > 0);
     return (
       <div className="p-4">
-        <TabHeader title="Available Hotels" subtitle="Click + to add to your plan" />
-        {!has ? <EmptyState icon="hotel" message="No hotel data." /> : allDestData.map((dd, di) => {
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+          <TabHeader title="Available Hotels" subtitle="Click + to add to your plan" />
+          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
+        </div>
+        {!has ? <EmptyState icon="hotel" message="No hotel data." /> : filteredDestData.map((dd, di) => {
           const hotels = (dd.hotels || []).filter(Boolean);
           if (!hotels.length) return null;
           return (
@@ -533,11 +661,14 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
   }
 
   if (filter === 'attractions') {
-    const has = allDestData.some(dd => dd.attractions?.length > 0);
+    const has = filteredDestData.some(dd => dd.attractions?.length > 0);
     return (
       <div className="p-4">
-        <TabHeader title="Attractions" subtitle="Click + to add to your plan" />
-        {!has ? <EmptyState icon="map" message="No attractions found." /> : allDestData.map((dd, di) => {
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+          <TabHeader title="Attractions" subtitle="Click + to add to your plan" />
+          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
+        </div>
+        {!has ? <EmptyState icon="map" message="No attractions found." /> : filteredDestData.map((dd, di) => {
           const atts = (dd.attractions || []).filter(Boolean);
           if (!atts.length) return null;
           return (
@@ -554,7 +685,7 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
   }
 
   if (filter === 'transport') {
-    const mainDest = rfq.destinations?.[0]?.destination || 'destination';
+    const mainDest = selectedDest || rfq.destinations?.[0]?.destination || 'destination';
     const opts = [
       { id:'cab',    type:'Cab / Taxi',    provider:'Uber / Local Taxi',          from:'Airport',          to:'City Centre',   duration:'30-60 min', price:'Varies',          recommended:true  },
       { id:'metro',  type:'Metro / Subway',provider:'Local Metro',                from:'Airport Station',  to:'City Centre',   duration:'20-45 min', price:'Budget-friendly', recommended:false },
@@ -563,7 +694,10 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
     ];
     return (
       <div className="p-4">
-        <TabHeader title="Transport Options" subtitle={`Local transport in ${mainDest}`} />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+          <TabHeader title="Transport Options" subtitle={`Local transport in ${mainDest}`} />
+          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
+        </div>
         <div className="flex flex-col gap-3">
           {opts.map(opt => {
             const id = 'transport_' + opt.id;
@@ -580,7 +714,16 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
 
 // ─── Main DetailPage ───────────────────────────────────────────────────────────
 export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialPlan = [] }) {
-  const [rfq,           setRfq]           = useState(initialRfq);
+  const [rfq,           setRfq]           = useState(() => {
+    // Try to load saved RFQ data from localStorage first
+    try {
+      const savedRfq = localStorage.getItem('current_rfq_' + (initialRfq?._id || 'default'));
+      if (savedRfq) {
+        return JSON.parse(savedRfq);
+      }
+    } catch {}
+    return initialRfq;
+  });
   const [profile,       setProfile]       = useState({ fullName:'', phone:'', passport:'', budget:'', reviewer:'' });
   const [showTpForm,    setShowTpForm]    = useState(false);
   const [showDetails,   setShowDetails]   = useState(false);
@@ -588,8 +731,16 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
   const [showBudgetToast, setShowBudgetToast] = useState(true);
   const [viewMode,      setViewMode]      = useState('daywise');
   const [activeFilter,  setActiveFilter]  = useState('flights');
+  const [planDestFilter, setPlanDestFilter] = useState('');
 
   const handleSaveProfile = (p) => { localStorage.setItem('tp_profile', JSON.stringify(p)); setProfile(p); };
+
+  // Initialize RFQ data save on mount
+  useEffect(() => {
+    try {
+      localStorage.setItem('current_rfq_' + (rfq?._id || 'default'), JSON.stringify(rfq));
+    } catch {}
+  }, [rfq]);
 
   const planKeyRef = useRef('plan_' + (initialRfq?._id || 'default'));
 
@@ -606,10 +757,33 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
 
   const totalNights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || 0), 0) || 1;
   const destNames   = rfq.destinations?.map(d => d.destination).filter(Boolean) || [];
-  const title       = destNames.join(' · ') + ' ' + (totalNights + 1) + '-Day Tour';
+  const title       = (rfq._id ? `${rfq._id} · ` : '') + destNames.join(' · ') + ' ' + (totalNights + 1) + '-Day Tour';
 
-  // Use real destinationData from rfq — no fake fallback
-  const allDestData = rfq.destinationData || [];
+  const allDestData = rfq.destinationData?.length > 0
+    ? rfq.destinationData
+    : (rfq.destinations || []).map(dest => ({
+        destination: dest.destination,
+        hotels: Array.from({ length: 6 }, (_, i) => ({
+          hotelId: `PLACEHOLDER_${i}`,
+          name: `${['Grand Hotel ', '', ' Palace Hotel', ' Boutique Hotel', ' Suites', 'Hotel Centrale '][i] || 'Hotel '}${dest.destination}`,
+          cityName: dest.destination,
+          stars: [3, 4, 5, 4, 3, 5][i] || 3,
+          address: dest.destination,
+          rating: 4.0 + Math.random() * 0.9,
+          price: Math.floor(2000 + Math.random() * 8000),
+          currency: 'INR',
+          available: true,
+        })),
+        attractions: Array.from({ length: 8 }, (_, i) => ({
+          attractionId: `PLACEHOLDER_${i}`,
+          name: `${['National Museum of ', '', ' Historic Center', ' Central Park', ' Art Gallery', ' Old Town', ' Cathedral', ' Monument'][i] || 'Attraction '}${dest.destination}`,
+          cityName: dest.destination,
+          category: ['Museum', 'Landmark', 'Park', 'Art Gallery', 'Attraction', 'Historic Site', 'Monument', 'Zoo'][i],
+          address: dest.destination,
+          rating: 4.0 + Math.random() * 0.9,
+          available: true,
+        })),
+      }));
 
   const filterTabs = [
     { id:'flights',     label:'Flights'     },
@@ -651,27 +825,54 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
     });
   };
 
-  const handleRfqUpdate = (u) => { setRfq(u); if (onUpdate) onUpdate(u); };
+  const handleRfqUpdate = (u) => { 
+    setRfq(u); 
+    // Save RFQ data to localStorage for persistence
+    try {
+      localStorage.setItem('current_rfq_' + (u._id || 'default'), JSON.stringify(u));
+    } catch {}
+    if (onUpdate) onUpdate(u); 
+  };
 
   const flightTotal  = planItems.filter(p => p.type === 'flight' && p.status !== 'cancelled').reduce((s, f) => s + (parseFloat(f.price) || 0), 0);
   const hotelTotal   = planItems.filter(p => p.type === 'hotel'  && p.status !== 'cancelled').reduce((s, h) => s + (parseFloat(h.price || 0) * (Number(h.nights) || 1)), 0);
-  const grandTotal   = flightTotal + hotelTotal;
+  const transportTotal = planItems.filter(p => p.type === 'transport' && p.status !== 'cancelled').reduce((s, t) => s + (parseFloat(t.price?.replace(/[^\d]/g, '') || 0) || 0), 0);
+  const grandTotal   = flightTotal + hotelTotal + transportTotal;
   const pendingCount = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled').length;
 
-  // budget from rfq or profile
   const activeBudget = rfq.budget || rfq.tripBudget || profile.budget || 0;
 
-  const dayGroups = {};
-  planItems.forEach(item => {
+  // ── Fixed multi-destination filter using getItemDestination ──────────────────
+  const filteredPlanItems = planDestFilter
+    ? planItems.filter(item => getItemDestination(item, destNames) === planDestFilter)
+    : planItems;
+
+  // Day-wise groups sorted chronologically
+  const dayGroupsMap = {};
+  filteredPlanItems.forEach(item => {
     const d  = getResolvedDate(item);
     const dk = d ? fmtDate(d) : 'No Date';
-    if (!dayGroups[dk]) dayGroups[dk] = [];
-    dayGroups[dk].push(item);
+    if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
+    dayGroupsMap[dk].push(item);
+  });
+  const sortedDayEntries = Object.entries(dayGroupsMap).sort(([a], [b]) => {
+    if (a === 'No Date') return 1;
+    if (b === 'No Date') return -1;
+    return new Date(a) - new Date(b);
   });
 
+  // Type-wise groups
   const typeGroups = { flight:[], hotel:[], transport:[], restaurant:[], attraction:[], other:[] };
-  planItems.forEach(item => { (typeGroups[item.type] || typeGroups.other).push(item); });
+  filteredPlanItems.forEach(item => { (typeGroups[item.type] || typeGroups.other).push(item); });
   const typeLabels = { flight:'Flights', hotel:'Hotels', transport:'Transport', restaurant:'Restaurants', attraction:'Attractions', other:'Other' };
+
+  // Destination-wise groups (for item-wise view with multiple destinations)
+  const destGroupsMap = {};
+  filteredPlanItems.forEach(item => {
+    const d = getItemDestination(item, destNames) || 'Other';
+    if (!destGroupsMap[d]) destGroupsMap[d] = [];
+    destGroupsMap[d].push(item);
+  });
 
   const startDate = rfq?.destinations?.[0]?.dateOfArrival || rfq?.startDate || '';
   const endDate   = rfq?.destinations?.[rfq?.destinations?.length - 1]?.dateOfDeparture || rfq?.endDate || '';
@@ -708,10 +909,21 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
             </button>
             <div>
               <h1 className="text-sm font-bold text-gray-900 leading-tight">{title}</h1>
-              <p className="text-[11px] text-gray-400">Trip details and planning</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {rfq._id && <span className="text-[10px] font-semibold text-gray-400">RFQ: {rfq._id}</span>}
+                {destNames.length > 0 && <span className="text-[10px] text-gray-400">|</span>}
+                {destNames.length > 0 && destNames.map((d, i) => (
+                  <span key={i} style={{ fontSize:'10px', fontWeight:600, background:'#f3f4f6', color:'#374151', borderRadius:'4px', padding:'1px 6px' }}>{d}</span>
+                ))}
+              </div>
             </div>
           </div>
-          <button onClick={() => setShowDetails(v => !v)} className="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Details</button>
+
+          {/* ── Permission Avatars + Details ── */}
+          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+            <PermissionAvatars />
+            <button onClick={() => setShowDetails(v => !v)} className="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Details</button>
+          </div>
         </div>
       </div>
 
@@ -756,14 +968,18 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
             <BookView planItems={planItems} onClose={() => setShowBookView(false)} onPay={handlePay} viewMode={viewMode} setViewMode={setViewMode} />
           ) : (
             <div className="flex flex-col h-full bg-white">
+              {/* Plan header */}
               <div style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                   <span style={{ fontSize:'13px', fontWeight:800, color:'#111827', textTransform:'uppercase', letterSpacing:'0.05em' }}>Plan Summary</span>
                   {planItems.length > 0 && <span style={{ fontSize:'10px', fontWeight:700, background:'rgb(247,190,57)', color:'#1a1a1a', borderRadius:'20px', padding:'1px 8px' }}>{planItems.length}</span>}
+                  {destNames.length > 1 && (
+                    <DestDropdown destinations={destNames} selected={planDestFilter} onChange={setPlanDestFilter} />
+                  )}
                 </div>
                 <div style={{ display:'flex', gap:'6px' }}>
                   {[{ v:'daywise', l:'Day-wise' }, { v:'itemwise', l:'Item-wise' }].map(opt => (
-                    <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding:'4px 12px', borderRadius:'20px', fontSize:'11px', fontWeight:600, cursor:'pointer', border: viewMode === opt.v ? '2px solid #F7BE39' : '1px solid #e5e7eb', background: viewMode === opt.v ? '#fef9c3' : '#fff', color: viewMode === opt.v ? '#92400e' : '#6b7280' }}>{opt.l}</button>
+                    <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding:'4px 12px', borderRadius:'20px', fontSize:'11px', fontWeight:600, cursor:'pointer', border: viewMode === opt.v ? '2px solid #F7BE39' : '1px solid #e5e7eb', background: viewMode === opt.v ? '#fef9c3' : '#fff', color: viewMode === opt.v ? '#92400e' : '#6b7280' }}>{opt.v === viewMode ? opt.l : opt.l}</button>
                   ))}
                 </div>
               </div>
@@ -771,12 +987,17 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
               <div style={{ flex:1, overflowY:'auto', padding:'12px' }}>
                 {planItems.length === 0 ? (
                   <div style={{ textAlign:'center', padding:'40px 0' }}>
-                    <div style={{ fontSize:'32px', marginBottom:'8px' }}>plan</div>
+                    <div style={{ fontSize:'32px', marginBottom:'8px' }}>✈️</div>
                     <p style={{ fontSize:'12px', color:'#9ca3af', fontWeight:500 }}>Your plan is empty.</p>
                     <p style={{ fontSize:'11px', color:'#d1d5db' }}>Add flights, hotels and more.</p>
                   </div>
+                ) : filteredPlanItems.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:'30px 0', fontSize:'12px', color:'#9ca3af' }}>
+                    No items for selected destination.
+                  </div>
                 ) : viewMode === 'daywise' ? (
-                  Object.entries(dayGroups).map(([dk, items]) => (
+                  // ── Day-wise ──
+                  sortedDayEntries.map(([dk, items]) => (
                     <div key={dk} style={{ marginBottom:'16px' }}>
                       <SectionDivider label={`${dk} (${items.length})`} />
                       <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
@@ -785,14 +1006,47 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
                     </div>
                   ))
                 ) : (
-                  Object.entries(typeGroups).map(([type, items]) =>
-                    items.length === 0 ? null : (
-                      <div key={type} style={{ marginBottom:'16px' }}>
-                        <SectionDivider label={typeLabels[type] || type} />
-                        <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                          {items.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
+                  // ── Item-wise: multi-dest groups by destination → type; single dest → just type ──
+                  destNames.length > 1 && !planDestFilter ? (
+                    Object.entries(destGroupsMap).map(([destName, destItems]) => (
+                      <div key={destName} style={{ marginBottom:'22px' }}>
+                        {/* Destination header */}
+                        <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+                          <div style={{
+                            width:'22px', height:'22px', borderRadius:'50%',
+                            background:'rgb(247,190,57)', color:'#1a1a1a',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontSize:'11px', fontWeight:800, flexShrink:0,
+                          }}>
+                            {destNames.indexOf(destName) + 1 || '·'}
+                          </div>
+                          <span style={{ fontSize:'12px', fontWeight:800, color:'#111827', textTransform:'uppercase', letterSpacing:'0.05em' }}>{destName}</span>
+                          <span style={{ fontSize:'10px', fontWeight:600, background:'#f3f4f6', color:'#6b7280', borderRadius:'20px', padding:'1px 7px' }}>{destItems.length}</span>
                         </div>
+                        {(['flight','hotel','transport','restaurant','attraction','other']).map(type => {
+                          const tItems = destItems.filter(i => i.type === type);
+                          if (!tItems.length) return null;
+                          return (
+                            <div key={type} style={{ marginBottom:'10px' }}>
+                              <SectionDivider label={typeLabels[type] || type} />
+                              <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                                {tItems.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                    ))
+                  ) : (
+                    Object.entries(typeGroups).map(([type, items]) =>
+                      items.length === 0 ? null : (
+                        <div key={type} style={{ marginBottom:'16px' }}>
+                          <SectionDivider label={typeLabels[type] || type} />
+                          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                            {items.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
+                          </div>
+                        </div>
+                      )
                     )
                   )
                 )}
@@ -803,8 +1057,8 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
                   <div style={{ padding:'10px 16px', display:'flex', flexDirection:'column', gap:'4px' }}>
                     {flightTotal > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Flights</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(flightTotal)}</span></div>}
                     {hotelTotal  > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Hotels</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(hotelTotal)}</span></div>}
+                    {transportTotal > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Transport</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(transportTotal)}</span></div>}
                     {grandTotal  > 0 && <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:'6px', borderTop:'1px solid #e5e7eb', marginTop:'4px' }}><span style={{ fontSize:'13px', fontWeight:800, color:'#111827', textTransform:'uppercase' }}>Total</span><span style={{ fontSize:'15px', fontWeight:800, color:'rgb(247,190,57)' }}>{fmt(grandTotal)}</span></div>}
-                    {/* ── Budget Warning ── */}
                     {(() => {
                       const budgetNum = parseFloat(rfq.budget || rfq.tripBudget || 0);
                       if (budgetNum > 0 && grandTotal > budgetNum) {
