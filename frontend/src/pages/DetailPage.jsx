@@ -1,11 +1,12 @@
 // pages/DetailPage.jsx
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback,useMemo  } from 'react';
 import { parseDays } from '../utils/itineraryHelpers';
 import AIChat         from '../components/detail/AIChat';
 import FlightsTab     from '../components/FlightsTab';
 import HotelCard      from '../components/detail/HotelCard';
 import AttractionCard from '../components/detail/AttractionCard';
 import TransportCard  from '../components/detail/TransportCard';
+import GenieChatButton from '../components/detail/GenieChatButton';
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,7 +57,6 @@ const getResolvedDate = (item) => {
 };
 
 // ─── getItemDestination ───────────────────────────────────────────────────────
-// Robustly figure out which destination an item belongs to
 function getItemDestination(item, destNames) {
   const candidates = [
     item.cityName,
@@ -82,7 +82,6 @@ function getItemDestination(item, destNames) {
 }
 
 // ─── PermissionAvatars ────────────────────────────────────────────────────────
-// Dummy users — replace with real permission data from your backend
 const DUMMY_USERS = [
   { initial: 'T', name: 'Trushant Shah', permission: 'Admin',    permBg: '#ede9fe', permColor: '#5b21b6', avatarBg: '#8b5cf6' },
   { initial: 'R', name: 'Rahul Mehta',   permission: 'Can Edit', permBg: '#dbeafe', permColor: '#1e40af', avatarBg: '#0ea5e9' },
@@ -133,7 +132,6 @@ function PermissionAvatars() {
               zIndex:9999, pointerEvents:'none',
               boxShadow:'0 4px 16px rgba(0,0,0,0.22)',
             }}>
-              {/* Arrow */}
               <div style={{
                 position:'absolute', top:'-5px', left:'50%', transform:'translateX(-50%)',
                 width:0, height:0,
@@ -176,7 +174,6 @@ function SectionDivider({ label }) {
     </div>
   );
 }
-
 
 // ─── BudgetToast ──────────────────────────────────────────────────────────────
 function BudgetToast({ grandTotal, budget, onClose }) {
@@ -712,15 +709,446 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
   return null;
 }
 
+// ─── DestinationTimeline (Panel 2 — Premium Travel Timeline) ─────────────────
+function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan, viewMode, setViewMode, setShowBookView, setActiveFilter, startDate }) {
+  const getSortedItemsForDest = (dest) => {
+    const items = planItems.filter(item => getItemDestination(item, destNames) === dest);
+    return items.sort((a, b) => {
+      const da = getResolvedDate(a);
+      const db = getResolvedDate(b);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return new Date(da) - new Date(db);
+    });
+  };
+
+  const unmatchedItems = planItems.filter(item => !getItemDestination(item, destNames));
+  // ─── Fixed Day Calculation Logic ───
+  const dayGroupsMap = {};
+  planItems.forEach(item => {
+    const d = getResolvedDate(item); // ISO Date format: "2026-03-25"
+    const dk = d ? d : 'No Date';   // Keep ISO as key for math, not formatted string
+    if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
+    dayGroupsMap[dk].push(item);
+  });
+
+  const sortedDayEntries = Object.entries(dayGroupsMap).sort(([a], [b]) => {
+    if (a === 'No Date') return 1;
+    if (b === 'No Date') return -1;
+    return new Date(a) - new Date(b);
+  });
+
+  // Calculate baseline using the trip's official start date
+  const tripBaseline = startDate ? new Date(startDate + (startDate.includes('T') ? '' : 'T00:00:00')) : null;
+ 
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
+
+      {/* ── Sticky Header ── */}
+      <div style={{
+        padding: '12px 20px',
+        borderBottom: '1px solid #f3f4f6',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: '#fff',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        boxShadow: '0 1px 0 #f3f4f6',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 900, color: '#111827', letterSpacing: '0.03em' }}>PLAN SUMMARY</span>
+          {planItems.length > 0 && (
+            <span style={{
+              fontSize: '10px', fontWeight: 800,
+              background: 'rgb(247,190,57)', color: '#1a1a1a',
+              borderRadius: '20px', padding: '2px 10px',
+              letterSpacing: '0.04em',
+            }}>
+              {planItems.length} {planItems.length === 1 ? 'PLAN' : 'PLANS'}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '12px' }}>
+          {[{ label: 'Day-wise', value: 'daywise' }, { label: 'Item-wise', value: 'itemwise' }].map(opt => {
+            const active = viewMode === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setViewMode(opt.value)}
+                style={{
+                  padding: '6px 15px', borderRadius: '9px',
+                  fontSize: '11px', fontWeight: 700,
+                  cursor: 'pointer', border: 'none',
+                  background: active ? '#fff' : 'transparent',
+                  color: active ? '#111827' : '#6b7280',
+                  boxShadow: active ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.18s',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Scrollable Timeline Body ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fafafa' }}>
+
+       {planItems.length === 0 ? (
+          /* Empty State */
+          <div style={{ textAlign: 'center', padding: '64px 20px' }}>
+            <div style={{ fontSize: '52px', marginBottom: '18px' }}>🗺️</div>
+            <h3 style={{ fontSize: '17px', fontWeight: 900, color: '#374151', marginBottom: '8px' }}>Build Your Travel Story</h3>
+            <p style={{ fontSize: '12px', color: '#9ca3af', maxWidth: '220px', margin: '0 auto', lineHeight: '1.6' }}>
+              Select flights, hotels, and attractions from the right panel to craft your perfect journey.
+            </p>
+          </div>
+        ) : viewMode === 'daywise' ? (
+
+          /* ══ DAY-WISE VIEW (Fixed Day Logic) ══ */
+          <div style={{ position: 'relative' }}>
+            {/* Global vertical line */}
+            <div style={{
+              position: 'absolute', left: '15px', top: '20px', bottom: '0',
+              width: '2px',
+              background: 'linear-gradient(to bottom, #F7BE39 0%, #e5e7eb 30%, #e5e7eb 100%)',
+              zIndex: 0,
+            }} />
+
+            {sortedDayEntries.map(([rawDate, items], gi) => {
+              // Logic: Day number = difference between current date and start date + 1
+              let currentDayNum = gi + 1; 
+              let displayHeaderDate = rawDate === 'No Date' ? 'Unscheduled' : fmtDate(rawDate);
+
+              if (rawDate !== 'No Date' && tripBaseline) {
+                const groupDate = new Date(rawDate + (rawDate.includes('T') ? '' : 'T00:00:00'));
+                const diffTime = groupDate - tripBaseline;
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                currentDayNum = diffDays + 1;
+              }
+
+              return (
+                <div key={rawDate} style={{ marginBottom: '28px', position: 'relative' }}>
+                  {/* Date Header with Circle Icon */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                    <div style={{
+                      width: '32px', height: '32px', flexShrink: 0,
+                      background: 'linear-gradient(135deg, #F7BE39, #f59e0b)',
+                      borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: '11px', fontWeight: 900,
+                      boxShadow: '0 4px 10px rgba(247,190,57,0.35)',
+                      zIndex: 1, position: 'relative',
+                    }}>
+                      {rawDate === 'No Date' ? '?' : currentDayNum}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgb(247,190,57)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        {rawDate === 'No Date' ? 'No Date' : 'Day ' + currentDayNum}
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827' }}>{displayHeaderDate}</div>
+                    </div>
+
+                    <div style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 700, color: '#9ca3af', background: '#f3f4f6', padding: '3px 10px', borderRadius: '20px' }}>
+                      {items.length} item{items.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+
+                  {/* Cards under this day */}
+                  <div style={{ marginLeft: '44px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {items.map(item => (
+                      <div key={item.id} style={{ position: 'relative' }}>
+                        <div style={{
+                          position: 'absolute', left: '-29px', top: '22px',
+                          width: '10px', height: '10px', borderRadius: '50%',
+                          background: '#fff', border: '3px solid rgb(247,190,57)',
+                          zIndex: 2, flexShrink: 0,
+                        }} />
+                        <PlanCard item={item} onRemove={removeFromPlan} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        ) : (
+          /* ══ ITEM-WISE / DESTINATION-WISE VIEW (Yahan se aapka code as it is rahega) ══ */
+
+          <div>
+            {destNames.map((dest, dIdx) => {
+              const sortedItems = getSortedItemsForDest(dest);
+              const hasHotel    = sortedItems.some(i => i.type === 'hotel');
+              const isLast      = dIdx === destNames.length - 1;
+
+              return (
+                <div key={dest} style={{ marginBottom: isLast ? '8px' : '0', position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute',
+                    left: '17px',
+                    top: '52px',
+                    bottom: isLast ? '0' : '-32px',
+                    width: '2px',
+                    background: isLast
+                      ? 'linear-gradient(to bottom, #e5e7eb 60%, transparent 100%)'
+                      : '#e5e7eb',
+                    zIndex: 0,
+                  }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                    <div style={{
+                      width: '36px', height: '36px', flexShrink: 0,
+                      background: 'linear-gradient(135deg, #F7BE39, #f59e0b)',
+                      borderRadius: '12px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: '16px', fontWeight: 900,
+                      boxShadow: '0 4px 14px rgba(247,190,57,0.38)',
+                      zIndex: 1, position: 'relative',
+                    }}>
+                      {dIdx + 1}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgb(247,190,57)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '2px' }}>
+                        Stage {dIdx + 1}
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#111827', lineHeight: 1.1 }}>{dest}</div>
+                    </div>
+                    {sortedItems.length > 0 && (
+                      <div style={{
+                        fontSize: '10px', fontWeight: 700, color: '#6b7280',
+                        background: '#f3f4f6', padding: '3px 10px', borderRadius: '20px',
+                      }}>
+                        {sortedItems.length} item{sortedItems.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginLeft: '50px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', marginBottom: '16px' }}>
+                    {sortedItems.length > 0 ? (
+                      sortedItems.map(item => (
+                        <div key={item.id} style={{ position: 'relative' }}>
+                          <div style={{
+                            position: 'absolute',
+                            left: '-33px', top: '22px',
+                            width: '10px', height: '10px', borderRadius: '50%',
+                            background: '#fff', border: '3px solid rgb(247,190,57)',
+                            zIndex: 2,
+                          }} />
+                          <PlanCard item={item} onRemove={removeFromPlan} />
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{
+                        padding: '20px 16px',
+                        border: '2px dashed #e5e7eb',
+                        borderRadius: '14px',
+                        textAlign: 'center',
+                        background: '#fff',
+                      }}>
+                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>📍</div>
+                        <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, marginBottom: '10px' }}>
+                          No activities added for {dest} yet.
+                        </p>
+                        <button
+                          onClick={() => setActiveFilter('hotels')}
+                          style={{
+                            fontSize: '11px', fontWeight: 800, color: 'rgb(247,190,57)',
+                            background: '#fffbeb', border: '1px solid #fef3c7',
+                            borderRadius: '8px', padding: '5px 14px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Explore Hotels +
+                        </button>
+                      </div>
+                    )}
+                    {!hasHotel && sortedItems.length > 0 && (
+                      <div style={{
+                        padding: '10px 14px',
+                        background: '#fffbeb',
+                        border: '1px solid #fef3c7',
+                        borderRadius: '12px',
+                        display: 'flex', alignItems: 'flex-start', gap: '10px',
+                      }}>
+                        <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>💡</span>
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#92400e', marginBottom: '2px' }}>Suggestion</div>
+                          <div style={{ fontSize: '11px', color: '#92400e', opacity: 0.85 }}>
+                            You haven't added a hotel for your stay in <strong>{dest}</strong>.
+                          </div>
+                          <button
+                            onClick={() => setActiveFilter('hotels')}
+                            style={{
+                              marginTop: '6px', fontSize: '10px', fontWeight: 700,
+                              color: '#92400e', background: 'none', border: 'none',
+                              cursor: 'pointer', padding: '0', textDecoration: 'underline',
+                            }}
+                          >
+                            Add hotel →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {dIdx < destNames.length - 1 && (
+                    <div style={{
+                      marginLeft: '50px',
+                      marginBottom: '28px',
+                      padding: '10px 14px',
+                      background: '#f3f4f6',
+                      borderRadius: '10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      border: '1px solid #e5e7eb',
+                    }}>
+                      <span style={{ fontSize: '14px' }}>✈️</span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
+                        Moving from <strong style={{ color: '#374151' }}>{dest}</strong> to <strong style={{ color: '#374151' }}>{destNames[dIdx + 1]}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {unmatchedItems.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <SectionDivider label="Other Items" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                  {unmatchedItems.map(item => (
+                    <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Sticky Footer ── */}
+      {planItems.length > 0 && (
+        <div style={{
+          padding: '16px 20px 20px',
+          borderTop: '1px solid #f3f4f6',
+          background: '#fff',
+          boxShadow: '0 -4px 24px rgba(0,0,0,0.04)',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>
+                Estimated Total
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#111827', letterSpacing: '-0.01em' }}>
+                {fmt(grandTotal)}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowBookView(true)}
+              style={{
+                padding: '14px 32px',
+                background: 'rgb(247,190,57)',
+                color: '#1a1a1a',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '14px',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 4px 18px rgba(247,190,57,0.38)',
+                transition: 'transform 0.18s, box-shadow 0.18s',
+                display: 'flex', alignItems: 'center', gap: '6px',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.03)';
+                e.currentTarget.style.boxShadow = '0 6px 24px rgba(247,190,57,0.5)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 18px rgba(247,190,57,0.38)';
+              }}
+            >
+              <span>BOOK NOW</span>
+              
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button style={{
+              flex: 1, padding: '10px',
+              background: '#fff', border: '1px solid #e5e7eb',
+              borderRadius: '12px', fontSize: '12px', fontWeight: 700,
+              color: '#6b7280', cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+            >
+              Send to review
+            </button>
+            <button style={{
+              flex: 1, padding: '10px',
+              background: '#fff', border: '1px solid #e5e7eb',
+              borderRadius: '12px', fontSize: '12px', fontWeight: 700,
+              color: '#6b7280', cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+            >
+              Manual send
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ResizerHandle ────────────────────────────────────────────────────────────
+function ResizerHandle({ onMouseDown, visible = true }) {
+  const [hovered, setHovered] = useState(false);
+  if (!visible) return null;
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '5px',
+        flexShrink: 0,
+        cursor: 'col-resize',
+        background: hovered ? 'rgb(247,190,57)' : 'transparent',
+        borderLeft: `1px solid ${hovered ? 'rgb(247,190,57)' : '#e5e7eb'}`,
+        borderRight: `1px solid ${hovered ? 'rgb(247,190,57)' : '#e5e7eb'}`,
+        transition: 'background 0.15s, border-color 0.15s',
+        position: 'relative',
+        zIndex: 20,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {hovered && (
+        <div style={{
+          width: '3px', height: '32px', borderRadius: '2px',
+          background: 'rgb(247,190,57)',
+          boxShadow: '0 0 6px rgba(247,190,57,0.6)',
+        }} />
+      )}
+    </div>
+  );
+}
+
 // ─── Main DetailPage ───────────────────────────────────────────────────────────
 export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialPlan = [] }) {
   const [rfq,           setRfq]           = useState(() => {
-    // Try to load saved RFQ data from localStorage first
     try {
       const savedRfq = localStorage.getItem('current_rfq_' + (initialRfq?._id || 'default'));
-      if (savedRfq) {
-        return JSON.parse(savedRfq);
-      }
+      if (savedRfq) return JSON.parse(savedRfq);
     } catch {}
     return initialRfq;
   });
@@ -729,13 +1157,66 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
   const [showDetails,   setShowDetails]   = useState(false);
   const [showBookView,  setShowBookView]  = useState(false);
   const [showBudgetToast, setShowBudgetToast] = useState(true);
-  const [viewMode,      setViewMode]      = useState('daywise');
+  const [viewMode,      setViewMode]      = useState('itemwise');
   const [activeFilter,  setActiveFilter]  = useState('flights');
-  const [planDestFilter, setPlanDestFilter] = useState('');
+  // ── Homepage se profile name load karne ke liye ──
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('tp_profile');
+    if (savedProfile) {
+      try {
+        setProfile(JSON.parse(savedProfile));
+      } catch (e) {
+        console.error("Error parsing profile", e);
+      }
+    }
+  }, []);
+
+  // ── Genie / Chat panel state ──
+  const [chatOpen, setChatOpen] = useState(true);
+
+  // ── Resizable panel widths ──
+  const MIN_WIDTH = 250;
+  const MAX_WIDTH = 500;
+  const [leftWidth,  setLeftWidth]  = useState(320);
+  const [rightWidth, setRightWidth] = useState(360);
+
+  const resizingRef  = useRef(null); // 'left' | 'right' | null
+  const startXRef    = useRef(0);
+  const startWRef    = useRef(0);
+
+  const startResizing = useCallback((side, e) => {
+    e.preventDefault();
+    resizingRef.current = side;
+    startXRef.current   = e.clientX;
+    startWRef.current   = side === 'left' ? leftWidth : rightWidth;
+
+    const onMouseMove = (ev) => {
+      const delta = ev.clientX - startXRef.current;
+      const newW  = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH,
+        resizingRef.current === 'left'
+          ? startWRef.current + delta
+          : startWRef.current - delta
+      ));
+      if (resizingRef.current === 'left')  setLeftWidth(newW);
+      if (resizingRef.current === 'right') setRightWidth(newW);
+    };
+
+    const onMouseUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup',   onMouseUp);
+      document.body.style.cursor    = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup',   onMouseUp);
+  }, [leftWidth, rightWidth]);
 
   const handleSaveProfile = (p) => { localStorage.setItem('tp_profile', JSON.stringify(p)); setProfile(p); };
 
-  // Initialize RFQ data save on mount
   useEffect(() => {
     try {
       localStorage.setItem('current_rfq_' + (rfq?._id || 'default'), JSON.stringify(rfq));
@@ -755,10 +1236,87 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
     try { localStorage.setItem(planKeyRef.current, JSON.stringify(items)); } catch {}
   };
 
-  const totalNights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || 0), 0) || 1;
-  const destNames   = rfq.destinations?.map(d => d.destination).filter(Boolean) || [];
-  const title       = (rfq._id ? `${rfq._id} · ` : '') + destNames.join(' · ') + ' ' + (totalNights + 1) + '-Day Tour';
+  // 1. Extract Base Data & Dates (Defined at the top to fix ReferenceError)
+  const startDate = rfq?.destinations?.[0]?.dateOfArrival || rfq?.startDate || '';
+  const endDate   = rfq?.destinations?.[rfq?.destinations?.length - 1]?.dateOfDeparture || rfq?.endDate || '';
+  const destNames = rfq.destinations?.map(d => d.destination).filter(Boolean) || [];
 
+  // 2. Journey Path: Source City + Unique Destinations + New Flight Cities (➔ Arrows)
+
+const journeyCities = useMemo(() => {
+  const cities = new Set();
+  const clean = (str) => (str || "").split(',')[0].trim().toUpperCase();
+
+  // Airport code → City name mapping
+  const AIRPORT_TO_CITY = {
+    'IDR':'INDORE','BOM':'MUMBAI','DEL':'DELHI','BLR':'BANGALORE',
+    'HYD':'HYDERABAD','MAA':'CHENNAI','CCU':'KOLKATA','AMD':'AHMEDABAD',
+    'LHR':'LONDON','LGW':'LONDON','STN':'LONDON',
+    'DXB':'DUBAI','AUH':'ABU DHABI','DOH':'DOHA',
+    'NRT':'TOKYO','HND':'TOKYO',
+    'JFK':'NEW YORK','LAX':'LOS ANGELES','SFO':'SAN FRANCISCO',
+    'CDG':'PARIS','ORY':'PARIS',
+    'FRA':'FRANKFURT','MUC':'MUNICH',
+    'AMS':'AMSTERDAM','BRU':'BRUSSELS',
+    'SIN':'SINGAPORE','KUL':'KUALA LUMPUR','BKK':'BANGKOK',
+    'HKG':'HONG KONG','ICN':'SEOUL','PEK':'BEIJING','PVG':'SHANGHAI',
+    'SYD':'SYDNEY','MEL':'MELBOURNE',
+    'DEN':'DENVER','ORD':'CHICAGO','MIA':'MIAMI',
+    'IST':'ISTANBUL','CAI':'CAIRO','JNB':'JOHANNESBURG',
+    'GRU':'SAO PAULO','EZE':'BUENOS AIRES','MEX':'MEXICO CITY',
+    'YYZ':'TORONTO','YVR':'VANCOUVER',
+    'FCO':'ROME','BCN':'BARCELONA','MAD':'MADRID',
+    'ZRH':'ZURICH','VIE':'VIENNA','CPH':'COPENHAGEN',
+    'OSL':'OSLO','ARN':'STOCKHOLM','HEL':'HELSINKI',
+    'ATH':'ATHENS','LIS':'LISBON','DUB':'DUBLIN',
+    'MXP':'MILAN','VCE':'VENICE','NAP':'NAPLES',
+    'PRG':'PRAGUE','BUD':'BUDAPEST','WAW':'WARSAW',
+  };
+
+  const isAirportCode = (str) => /^[A-Z]{3}$/.test((str || '').trim().toUpperCase());
+
+  const resolveCity = (str) => {
+    if (!str) return null;
+    const upper = str.trim().toUpperCase();
+    // Agar airport code hai toh city map se lo
+    if (isAirportCode(upper) && AIRPORT_TO_CITY[upper]) return AIRPORT_TO_CITY[upper];
+    // Agar pure 3-letter code hai aur map mein nahi toh skip
+    if (isAirportCode(upper)) return null;
+    // Otherwise city name as-is
+    return clean(str);
+  };
+
+  if (rfq.from) {
+    const c = resolveCity(rfq.from);
+    if (c) cities.add(c);
+  }
+
+  destNames.forEach(d => {
+    const c = resolveCity(d);
+    if (c) cities.add(c);
+  });
+
+  planItems.forEach(item => {
+    if (item.type === 'flight') {
+      // cityName sabse reliable, phir to, phir toAirport
+      const raw = item.cityName || item.to || item.toAirport;
+      const c = resolveCity(raw);
+      if (c) cities.add(c);
+    }
+  });
+
+  return Array.from(cities);
+}, [planItems, destNames, rfq.from]);
+  const journeyPath = journeyCities.join(' ➔ ');
+
+  // 3. Calculation for Date Range & Form-based Days
+  const tripDateRange = startDate && endDate ? `${fmtDate(startDate)} - ${fmtDate(endDate)}` : "";
+  const rfqTotalNights = rfq.destinations?.reduce((sum, d) => sum + (Number(d.nights || d.numberOfNights) || 0), 0) || 0;
+  const totalDaysFromForm = rfqTotalNights > 0 ? rfqTotalNights + 1 : 1;
+
+  // 4. Main Title Construction
+  const tripTitle = (rfq.tripName || "MY TRIP").toUpperCase();
+  const dynamicMainHeading = `${tripTitle} · ${totalDaysFromForm} Day Tour`;
   const allDestData = rfq.destinationData?.length > 0
     ? rfq.destinationData
     : (rfq.destinations || []).map(dest => ({
@@ -825,58 +1383,22 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
     });
   };
 
-  const handleRfqUpdate = (u) => { 
-    setRfq(u); 
-    // Save RFQ data to localStorage for persistence
+  const handleRfqUpdate = (u) => {
+    setRfq(u);
     try {
       localStorage.setItem('current_rfq_' + (u._id || 'default'), JSON.stringify(u));
     } catch {}
-    if (onUpdate) onUpdate(u); 
+    if (onUpdate) onUpdate(u);
   };
 
-  const flightTotal  = planItems.filter(p => p.type === 'flight' && p.status !== 'cancelled').reduce((s, f) => s + (parseFloat(f.price) || 0), 0);
-  const hotelTotal   = planItems.filter(p => p.type === 'hotel'  && p.status !== 'cancelled').reduce((s, h) => s + (parseFloat(h.price || 0) * (Number(h.nights) || 1)), 0);
+  const flightTotal    = planItems.filter(p => p.type === 'flight'    && p.status !== 'cancelled').reduce((s, f) => s + (parseFloat(f.price) || 0), 0);
+  const hotelTotal     = planItems.filter(p => p.type === 'hotel'     && p.status !== 'cancelled').reduce((s, h) => s + (parseFloat(h.price || 0) * (Number(h.nights) || 1)), 0);
   const transportTotal = planItems.filter(p => p.type === 'transport' && p.status !== 'cancelled').reduce((s, t) => s + (parseFloat(t.price?.replace(/[^\d]/g, '') || 0) || 0), 0);
-  const grandTotal   = flightTotal + hotelTotal + transportTotal;
-  const pendingCount = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled').length;
+  const grandTotal     = flightTotal + hotelTotal + transportTotal;
 
   const activeBudget = rfq.budget || rfq.tripBudget || profile.budget || 0;
 
-  // ── Fixed multi-destination filter using getItemDestination ──────────────────
-  const filteredPlanItems = planDestFilter
-    ? planItems.filter(item => getItemDestination(item, destNames) === planDestFilter)
-    : planItems;
-
-  // Day-wise groups sorted chronologically
-  const dayGroupsMap = {};
-  filteredPlanItems.forEach(item => {
-    const d  = getResolvedDate(item);
-    const dk = d ? fmtDate(d) : 'No Date';
-    if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
-    dayGroupsMap[dk].push(item);
-  });
-  const sortedDayEntries = Object.entries(dayGroupsMap).sort(([a], [b]) => {
-    if (a === 'No Date') return 1;
-    if (b === 'No Date') return -1;
-    return new Date(a) - new Date(b);
-  });
-
-  // Type-wise groups
-  const typeGroups = { flight:[], hotel:[], transport:[], restaurant:[], attraction:[], other:[] };
-  filteredPlanItems.forEach(item => { (typeGroups[item.type] || typeGroups.other).push(item); });
-  const typeLabels = { flight:'Flights', hotel:'Hotels', transport:'Transport', restaurant:'Restaurants', attraction:'Attractions', other:'Other' };
-
-  // Destination-wise groups (for item-wise view with multiple destinations)
-  const destGroupsMap = {};
-  filteredPlanItems.forEach(item => {
-    const d = getItemDestination(item, destNames) || 'Other';
-    if (!destGroupsMap[d]) destGroupsMap[d] = [];
-    destGroupsMap[d].push(item);
-  });
-
-  const startDate = rfq?.destinations?.[0]?.dateOfArrival || rfq?.startDate || '';
-  const endDate   = rfq?.destinations?.[rfq?.destinations?.length - 1]?.dateOfDeparture || rfq?.endDate || '';
-
+ 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
 
@@ -888,6 +1410,13 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
           onClose={() => setShowBudgetToast(false)}
         />
       )}
+
+      {/* Genie Floating Chat Button — shown when chat is closed */}
+      <GenieChatButton
+        open={chatOpen}
+        onToggle={() => setChatOpen(true)}
+        unreadCount={0}
+      />
 
       {/* Navbar */}
       <header className="w-full z-30 flex-shrink-0" style={{ backgroundColor:'rgb(247,190,57)' }}>
@@ -903,23 +1432,40 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
       {/* Sub-bar */}
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-gray-700 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+       <div className="flex items-center gap-4">
+            <button onClick={onBack} className="w-8 h-8 bg-gray-50 hover:bg-gray-200 rounded-xl flex items-center justify-center text-gray-700 transition-all border border-gray-100">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>
             </button>
-            <div>
-              <h1 className="text-sm font-bold text-gray-900 leading-tight">{title}</h1>
-              <div className="flex items-center gap-2 flex-wrap">
-                {rfq._id && <span className="text-[10px] font-semibold text-gray-400">RFQ: {rfq._id}</span>}
-                {destNames.length > 0 && <span className="text-[10px] text-gray-400">|</span>}
-                {destNames.length > 0 && destNames.map((d, i) => (
-                  <span key={i} style={{ fontSize:'10px', fontWeight:600, background:'#f3f4f6', color:'#374151', borderRadius:'4px', padding:'1px 6px' }}>{d}</span>
-                ))}
+         <div style={{ minWidth: 0 }}>
+              {/* Trip Title + Days + Date Range on the right */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                <h1 className="text-[16px] font-black text-gray-900 tracking-tight leading-none">
+                  {dynamicMainHeading}
+                </h1>
+                {tripDateRange && (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', borderLeft: '1.5px solid #e5e7eb', paddingLeft: '12px' }}>
+                    {tripDateRange}
+                  </span>
+                )}
+              </div>
+
+              {/* ID Badge + Visual Journey Route (Arrows ➔) */}
+              <div className="flex items-center gap-2">
+                {rfq._id && (
+                  <span className="text-[9px] font-extrabold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-widest">
+                    ID: {rfq._id.replace(': ', '').replace(':', '')}
+                  </span>
+                )}
+                <span className="text-gray-300 text-xs">|</span>
+                <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      {journeyPath}
+                   </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* ── Permission Avatars + Details ── */}
           <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
             <PermissionAvatars />
             <button onClick={() => setShowDetails(v => !v)} className="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Details</button>
@@ -954,162 +1500,101 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
         </div>
       )}
 
-      {/* Three panels */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* ══════════════════════════════════════════════
+          Three-Panel Resizable Layout
+      ══════════════════════════════════════════════ */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'row' }}>
 
-        {/* Panel 1: AI Chat */}
-        <div className="flex flex-col h-full overflow-hidden border-r border-gray-200" style={{ width:'25%' }}>
-          <AIChat rfq={rfq} onRfqUpdate={handleRfqUpdate} onTabSwitch={tab => setActiveFilter(tab)} />
-        </div>
-
-        {/* Panel 2: Plan Summary OR BookView */}
-        <div className="flex flex-col h-full border-r border-gray-200 overflow-hidden" style={{ width:'50%' }}>
-          {showBookView ? (
-            <BookView planItems={planItems} onClose={() => setShowBookView(false)} onPay={handlePay} viewMode={viewMode} setViewMode={setViewMode} />
-          ) : (
-            <div className="flex flex-col h-full bg-white">
-              {/* Plan header */}
-              <div style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                  <span style={{ fontSize:'13px', fontWeight:800, color:'#111827', textTransform:'uppercase', letterSpacing:'0.05em' }}>Plan Summary</span>
-                  {planItems.length > 0 && <span style={{ fontSize:'10px', fontWeight:700, background:'rgb(247,190,57)', color:'#1a1a1a', borderRadius:'20px', padding:'1px 8px' }}>{planItems.length}</span>}
-                  {destNames.length > 1 && (
-                    <DestDropdown destinations={destNames} selected={planDestFilter} onChange={setPlanDestFilter} />
-                  )}
-                </div>
-                <div style={{ display:'flex', gap:'6px' }}>
-                  {[{ v:'daywise', l:'Day-wise' }, { v:'itemwise', l:'Item-wise' }].map(opt => (
-                    <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding:'4px 12px', borderRadius:'20px', fontSize:'11px', fontWeight:600, cursor:'pointer', border: viewMode === opt.v ? '2px solid #F7BE39' : '1px solid #e5e7eb', background: viewMode === opt.v ? '#fef9c3' : '#fff', color: viewMode === opt.v ? '#92400e' : '#6b7280' }}>{opt.v === viewMode ? opt.l : opt.l}</button>
-                  ))}
-                </div>
+        {/* ── Panel 1: AI Chat (collapsible via Genie button) ── */}
+        <div
+          style={{
+            width: chatOpen ? leftWidth : 0,
+            flexShrink: 0,
+            overflow: 'hidden',
+            transition: chatOpen ? 'none' : 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRight: chatOpen ? 'none' : '0',
+            position: 'relative',
+          }}
+        >
+          {chatOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              {/* Hide button injected into the panel header area */}
+              <div style={{
+                position: 'absolute', top: '8px', right: '8px', zIndex: 50,
+              }}>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  title="Hide AI Chat"
+                  style={{
+                    width: '26px', height: '26px',
+                    borderRadius: '50%',
+                    background: 'rgba(247,190,57,0.15)',
+                    border: '1px solid rgba(247,190,57,0.4)',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '10px', color: '#92400e', fontWeight: 800,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(247,190,57,0.35)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(247,190,57,0.15)'; }}
+                >
+                  ‹
+                </button>
               </div>
-
-              <div style={{ flex:1, overflowY:'auto', padding:'12px' }}>
-                {planItems.length === 0 ? (
-                  <div style={{ textAlign:'center', padding:'40px 0' }}>
-                    <div style={{ fontSize:'32px', marginBottom:'8px' }}>✈️</div>
-                    <p style={{ fontSize:'12px', color:'#9ca3af', fontWeight:500 }}>Your plan is empty.</p>
-                    <p style={{ fontSize:'11px', color:'#d1d5db' }}>Add flights, hotels and more.</p>
-                  </div>
-                ) : filteredPlanItems.length === 0 ? (
-                  <div style={{ textAlign:'center', padding:'30px 0', fontSize:'12px', color:'#9ca3af' }}>
-                    No items for selected destination.
-                  </div>
-                ) : viewMode === 'daywise' ? (
-                  // ── Day-wise ──
-                  sortedDayEntries.map(([dk, items]) => (
-                    <div key={dk} style={{ marginBottom:'16px' }}>
-                      <SectionDivider label={`${dk} (${items.length})`} />
-                      <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                        {items.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  // ── Item-wise: multi-dest groups by destination → type; single dest → just type ──
-                  destNames.length > 1 && !planDestFilter ? (
-                    Object.entries(destGroupsMap).map(([destName, destItems]) => (
-                      <div key={destName} style={{ marginBottom:'22px' }}>
-                        {/* Destination header */}
-                        <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                          <div style={{
-                            width:'22px', height:'22px', borderRadius:'50%',
-                            background:'rgb(247,190,57)', color:'#1a1a1a',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontSize:'11px', fontWeight:800, flexShrink:0,
-                          }}>
-                            {destNames.indexOf(destName) + 1 || '·'}
-                          </div>
-                          <span style={{ fontSize:'12px', fontWeight:800, color:'#111827', textTransform:'uppercase', letterSpacing:'0.05em' }}>{destName}</span>
-                          <span style={{ fontSize:'10px', fontWeight:600, background:'#f3f4f6', color:'#6b7280', borderRadius:'20px', padding:'1px 7px' }}>{destItems.length}</span>
-                        </div>
-                        {(['flight','hotel','transport','restaurant','attraction','other']).map(type => {
-                          const tItems = destItems.filter(i => i.type === type);
-                          if (!tItems.length) return null;
-                          return (
-                            <div key={type} style={{ marginBottom:'10px' }}>
-                              <SectionDivider label={typeLabels[type] || type} />
-                              <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                                {tItems.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))
-                  ) : (
-                    Object.entries(typeGroups).map(([type, items]) =>
-                      items.length === 0 ? null : (
-                        <div key={type} style={{ marginBottom:'16px' }}>
-                          <SectionDivider label={typeLabels[type] || type} />
-                          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                            {items.map(item => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />)}
-                          </div>
-                        </div>
-                      )
-                    )
-                  )
-                )}
-              </div>
-
-              {planItems.length > 0 && (
-                <div style={{ flexShrink:0, borderTop:'1px solid #f3f4f6', background:'#fafafa' }}>
-                  <div style={{ padding:'10px 16px', display:'flex', flexDirection:'column', gap:'4px' }}>
-                    {flightTotal > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Flights</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(flightTotal)}</span></div>}
-                    {hotelTotal  > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Hotels</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(hotelTotal)}</span></div>}
-                    {transportTotal > 0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#6b7280' }}><span>Transport</span><span style={{ fontWeight:600, color:'#374151' }}>{fmt(transportTotal)}</span></div>}
-                    {grandTotal  > 0 && <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:'6px', borderTop:'1px solid #e5e7eb', marginTop:'4px' }}><span style={{ fontSize:'13px', fontWeight:800, color:'#111827', textTransform:'uppercase' }}>Total</span><span style={{ fontSize:'15px', fontWeight:800, color:'rgb(247,190,57)' }}>{fmt(grandTotal)}</span></div>}
-                    {(() => {
-                      const budgetNum = parseFloat(rfq.budget || rfq.tripBudget || 0);
-                      if (budgetNum > 0 && grandTotal > budgetNum) {
-                        const over = grandTotal - budgetNum;
-                        return (
-                          <div style={{ marginTop:'8px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'10px', padding:'10px 12px', display:'flex', alignItems:'flex-start', gap:'8px' }}>
-                            <span style={{ fontSize:'16px', flexShrink:0 }}>⚠️</span>
-                            <div>
-                              <div style={{ fontSize:'12px', fontWeight:700, color:'#dc2626', marginBottom:'2px' }}>Budget Exceeded!</div>
-                              <div style={{ fontSize:'11px', color:'#ef4444' }}>
-                                You are <strong>{fmt(over)}</strong> over your budget of <strong>{fmt(budgetNum)}</strong>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (budgetNum > 0 && grandTotal > 0 && grandTotal <= budgetNum) {
-                        const remaining = budgetNum - grandTotal;
-                        return (
-                          <div style={{ marginTop:'8px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'10px', padding:'10px 12px', display:'flex', alignItems:'flex-start', gap:'8px' }}>
-                            <span style={{ fontSize:'16px', flexShrink:0 }}>✅</span>
-                            <div>
-                              <div style={{ fontSize:'12px', fontWeight:700, color:'#16a34a', marginBottom:'2px' }}>Within Budget</div>
-                              <div style={{ fontSize:'11px', color:'#22c55e' }}>
-                                <strong>{fmt(remaining)}</strong> remaining from your budget
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:'8px' }}>
-                    <button onClick={() => pendingCount > 0 && setShowBookView(true)} disabled={pendingCount === 0}
-                      style={{ width:'100%', padding:'12px', background: pendingCount > 0 ? 'rgb(247,190,57)' : '#e5e7eb', color: pendingCount > 0 ? '#1a1a1a' : '#9ca3af', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:800, cursor: pendingCount > 0 ? 'pointer' : 'not-allowed' }}>
-                      Book now
-                    </button>
-                    <div style={{ display:'flex', gap:'8px' }}>
-                      <button style={{ flex:1, padding:'9px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', fontSize:'12px', fontWeight:600, color:'#9ca3af', cursor:'pointer' }}>Send to review</button>
-                      <button style={{ flex:1, padding:'9px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:'10px', fontSize:'12px', fontWeight:600, color:'#9ca3af', cursor:'pointer' }}>Manual send</button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <AIChat rfq={rfq} onRfqUpdate={handleRfqUpdate} onTabSwitch={tab => setActiveFilter(tab)} />
             </div>
           )}
         </div>
 
-        {/* Panel 3: Filter tabs + content */}
-        <div className="flex flex-col h-full overflow-hidden" style={{ width:'25%' }}>
+        {/* ── Left Resizer Handle (only when chat is open) ── */}
+        <ResizerHandle
+          visible={chatOpen}
+          onMouseDown={(e) => startResizing('left', e)}
+        />
+
+        {/* ── Panel 2: TRAVEL TIMELINE (flex-1, fills remaining space) ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          {showBookView ? (
+            <BookView
+              planItems={planItems}
+              onClose={() => setShowBookView(false)}
+              onPay={handlePay}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+            />
+          ) : (
+            <DestinationTimeline
+              planItems={planItems}
+              destNames={destNames}
+              grandTotal={grandTotal}
+              removeFromPlan={removeFromPlan}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              setShowBookView={setShowBookView}
+              setActiveFilter={setActiveFilter}
+              startDate={startDate} 
+            />
+          )}
+        </div>
+
+        {/* ── Right Resizer Handle ── */}
+        <ResizerHandle
+          visible={true}
+          onMouseDown={(e) => startResizing('right', e)}
+        />
+
+        {/* ── Panel 3: Filter tabs + content ── */}
+        <div
+          style={{
+            width: rightWidth,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           <div className="bg-white border-b border-gray-100 flex-shrink-0 overflow-x-auto">
             <div className="flex items-center gap-1 px-3 py-2 min-w-max">
               {filterTabs.map(f => (
@@ -1124,8 +1609,8 @@ export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialP
             <FilteredView filter={activeFilter} rfq={rfq} allDestData={allDestData} onAddToPlan={addToPlan} planItems={planItems} planIds={planIds} />
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
   );
 }
