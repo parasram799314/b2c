@@ -46,7 +46,7 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
   const mainDest    = destNames[0] || 'Destination';
   const heroImage   = getDestImage(mainDest);
   const travelType  = rfq.travelType || 'Leisure';
-  const transport   = rfq.modeOfTransport || 'Flight';
+  const transfer  = rfq.modeOfTransport || 'Flight';
 
   return (
     <div className="overflow-y-auto">
@@ -71,7 +71,7 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
                   {travelType}
                 </span>
                 <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium rounded-full px-2.5 py-0.5">
-                  ✈ {transport}
+                  ✈ {transfer}
                 </span>
               </div>
               <div className="text-white font-bold text-xl leading-tight">

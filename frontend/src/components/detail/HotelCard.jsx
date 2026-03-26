@@ -32,7 +32,15 @@ export default function HotelCard({ hotel, inPlan = false, onAdd }) {
   };
 
   return (
-    <div className={`relative bg-white border rounded-xl transition-all ${
+    <div 
+      draggable="true"
+  onDragStart={(e) => {
+    e.dataTransfer.setData("itemData", JSON.stringify({ ...hotel, type: 'hotel' }));
+    e.dataTransfer.effectAllowed = "copy";
+  }}
+ 
+    
+    className={`relative bg-white border rounded-xl transition-all ${
       inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
     }`} style={isSelecting ? { minHeight: '280px' } : {}}>
 

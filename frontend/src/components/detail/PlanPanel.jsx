@@ -1,8 +1,8 @@
 // components/detail/PlanPanel.jsx
 import { useEffect, useMemo, useState } from 'react';
 
-const TYPE_ICONS  = { flight:'✈️', hotel:'🏨', attraction:'🗺️', restaurant:'🍽️', transport:'🚗' };
-const TYPE_COLORS = { flight:'bg-blue-50 border-blue-100', hotel:'bg-amber-50 border-amber-100', attraction:'bg-green-50 border-green-100', restaurant:'bg-orange-50 border-orange-100', transport:'bg-gray-50 border-gray-100' };
+const TYPE_ICONS  = { flight:'✈️', hotel:'🏨', attraction:'🗺️', restaurant:'🍽️', transfer:'🚗' };
+const TYPE_COLORS = { flight:'bg-blue-50 border-blue-100', hotel:'bg-amber-50 border-amber-100', attraction:'bg-green-50 border-green-100', restaurant:'bg-orange-50 border-orange-100', transfer:'bg-gray-50 border-gray-100' };
 const TRANSPORT_ICONS = { cab:'🚕', metro:'🚇', bus:'🚌', rental:'🚗', train:'🚆', ferry:'⛴️' };
 
 function fmtDate(d) {
@@ -53,9 +53,9 @@ function PlanItem({ item, onRemove, status }) {
     if (item.price)   tags.push({color:'gold', label:`${item.currency||''} ${parseFloat(item.price).toLocaleString()}/night`});
     if (item.rating)  tags.push({color:'green',label:`⭐ ${item.rating}`});
   }
-  else if (item.type==='transport') {
+  else if (item.type==='transfer') {
     const tIcon=TRANSPORT_ICONS[item.id]||'🚗';
-    primary=`${tIcon} ${item.id?(item.id.charAt(0).toUpperCase()+item.id.slice(1)):'Transport'}`;
+    primary=`${tIcon} ${item.id?(item.id.charAt(0).toUpperCase()+item.id.slice(1)):'Transfer'}`;
     secondary=item.provider||'';
     if (item.from&&item.to) tags.push({color:'gray', label:`📍 ${item.from} → ${item.to}`});
     if (item.pickupDate)    tags.push({color:'amber',label:`📅 ${fmtDate(item.pickupDate)}`});
@@ -110,7 +110,7 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
 
   const flights    = planItems.filter(p=>p.type==='flight');
   const hotels     = planItems.filter(p=>p.type==='hotel');
-  const transports = planItems.filter(p=>p.type==='transport');
+  const transports = planItems.filter(p=>p.type==='transfer');
   const restaurants= planItems.filter(p=>p.type==='restaurant');
 
   const flightTotal = flights.reduce((s,f)=>s+(parseFloat(f.price)||0),0);
@@ -197,7 +197,7 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
               )}
 
               {transports.length>0 && (
-                <ModalSection icon="🚗" title="Transport" badge={transports.length} badgeColor="gray">
+                <ModalSection icon="🚗" title="Transfer" badge={transports.length} badgeColor="gray">
                   {transports.map((t,i)=>(
                     <ModalRow key={i}
                       left={<>
@@ -407,7 +407,7 @@ export default function PlanPanel({ planItems=[], onRemove, onClose }) {
   const [showPayment, setShowPayment] = useState(false);
 
   const grouped   = planItems.reduce((acc,item)=>{ if(!acc[item.type]) acc[item.type]=[]; acc[item.type].push(item); return acc; },{});
-  const typeOrder = ['flight','hotel','transport','restaurant','attraction'];
+  const typeOrder = ['flight','hotel','transfer','restaurant','attraction'];
 
   const flightTotal = planItems.filter(p=>p.type==='flight').reduce((s,f)=>s+(parseFloat(f.price)||0),0);
   const hotelTotal  = planItems.filter(p=>p.type==='hotel').reduce((s,h)=>s+(parseFloat(h.price||0)*(Number(h.nights)||1)),0);
@@ -431,7 +431,7 @@ export default function PlanPanel({ planItems=[], onRemove, onClose }) {
 
         <div className="overflow-y-auto p-3 flex flex-col gap-4" style={{flex:"1 1 0",minHeight:0}}>
           {planItems.length===0 ? (
-            <div className="text-center py-20 text-gray-300 text-[11px] italic">Your plan is empty.<br/>Add flights, hotels &amp; transport.</div>
+            <div className="text-center py-20 text-gray-300 text-[11px] italic">Your plan is empty.<br/>Add flights, hotels &amp; transfer.</div>
           ) : (
             typeOrder.map(type=>{
               if (!grouped[type]?.length) return null;

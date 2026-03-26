@@ -7,11 +7,21 @@ import HotelCard      from '../components/detail/HotelCard';
 import AttractionCard from '../components/detail/AttractionCard';
 import TransportCard  from '../components/detail/TransportCard';
 import GenieChatButton from '../components/detail/GenieChatButton';
+import OtherTab from '../components/detail/rightside/OtherTab';
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const WEGO = 'https://assets.wego.com/image/upload/h_240,c_fill,f_auto,fl_lossy,q_auto:best,g_auto/v20260217/flights/airlines_square/';
 const KIWI = 'https://images.kiwi.com/airlines/64/';
+
+// ─── CITIES (RFQForm se same) ────────────────────────────────
+const CITIES = [
+  'Indore, India','Mumbai, India','Delhi, India','Bangalore, India',
+  'Hyderabad, India','Chennai, India','Kolkata, India','Pune, India',
+  'Ahmedabad, India','Jaipur, India','Surat, India','Lucknow, India',
+  'London, UK','Dubai, UAE','Singapore','New York, USA',
+  'Paris, France','Tokyo, Japan',
+];
 
 const getLogoUrl = (name = '') => {
   const u = (name || '').trim().toUpperCase();
@@ -45,7 +55,7 @@ const getResolvedDate = (item) => {
   let d = '';
   if (item.type === 'flight')     d = item.depDate    || item.date || '';
   if (item.type === 'hotel')      d = item.checkIn    || item.date || '';
-  if (item.type === 'transport')  d = item.pickupDate || item.date || '';
+  if (item.type === 'transfer')  d = item.pickupDate || item.date || '';
   if (item.type === 'restaurant') d = item.visitDate  || item.date || '';
   if (item.type === 'other')      d = item.date || '';
   if (!d && item.id) {
@@ -197,7 +207,7 @@ function BudgetToast({ grandTotal, budget, onClose }) {
         </div>
       </div>
       <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', color: '#fff', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        ✕
+        🗑
       </button>
       <style>{`@keyframes budgetSlide{from{opacity:0;transform:translateX(-50%) translateY(-14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
     </div>
@@ -262,7 +272,7 @@ function ItemDetailModal({ item, onClose }) {
       <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:'18px', width:'100%', maxWidth:'420px', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.2)', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
         <div style={{ background:'rgb(247,190,57)', padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
           <span style={{ fontWeight:700, fontSize:'14px', color:'#1a1a1a' }}>
-            {item.type === 'flight' ? 'Flight Details' : item.type === 'hotel' ? 'Hotel Details' : item.type === 'attraction' ? 'Attraction' : item.type === 'other' ? 'Activity' : 'Transport'}
+            {item.type === 'flight' ? 'Flight Details' : item.type === 'hotel' ? 'Hotel Details' : item.type === 'attraction' ? 'Attraction' : item.type === 'other' ? 'Activity' : 'Transfer'}
           </span>
           <button onClick={onClose} style={{ width:'26px', height:'26px', borderRadius:'50%', background:'rgba(0,0,0,0.12)', border:'none', cursor:'pointer', fontSize:'13px', color:'#1a1a1a' }}>x</button>
         </div>
@@ -340,9 +350,9 @@ function ItemDetailModal({ item, onClose }) {
             </div>
           )}
 
-          {item.type === 'transport' && (
+          {item.type === 'transfer' && (
             <div>
-              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'4px' }}>{item.provider || item.id || 'Transport'}</div>
+              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'4px' }}>{item.provider || item.id || 'Transfer'}</div>
               <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
                 {item.from && item.to && <PTag bg="#f3f4f6" color="#374151">{item.from} to {item.to}</PTag>}
                 {item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
@@ -368,130 +378,225 @@ function ItemDetailModal({ item, onClose }) {
 }
 
 // ─── PlanCard ──────────────────────────────────────────────────────────────────
-function PlanCard({ item, onRemove }) {
-  const [imgErr,     setImgErr]     = useState(false);
+function PlanCard({ item, onRemove, itemIndex, onReorder }) {
+  const [imgErr, setImgErr] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const status       = item.status || 'pending';
-  const logoSrc      = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
-  const hotelImg     = item.type === 'hotel'  ? (item.image || item.imageUrl || item.photo || null) : null;
+  const [showNotes, setShowNotes] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const [noteText, setNoteText] = useState(item.userNote || item.note || '');
+  const [attachments, setAttachments] = useState(item.attachments || []);
+
+  const status = item.status || 'pending';
   const resolvedDate = getResolvedDate(item);
-  const titleText    = item.type === 'flight' ? `${item.fromAirport || item.from || ''} to ${item.toAirport || item.to || ''}` : item.hotelName || item.name || item.type;
+  const titleText = item.type === 'flight' ? `${item.fromAirport || item.from || ''} to ${item.toAirport || item.to || ''}` : item.hotelName || item.name || item.type;
+  const logoSrc = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
 
-  const borderStyle =
-    status === 'paid'      ? { borderColor:'#86efac', background:'#f0fdf4' }
-    : status === 'cancelled' ? { borderColor:'#fca5a5', background:'#fff5f5', opacity:0.75 }
-    :                          { borderColor:'#e5e7eb', background:'#fff' };
+  const borderStyle = status === 'paid'
+    ? { borderColor: '#86efac', background: '#f0fdf4' }
+    : (item.type === 'other' && status === 'pending')
+      ? { borderColor: '#fde68a', background: '#fffdf5' }
+      : { borderColor: '#e5e7eb', background: '#fff' };
 
-  return (
-    <div>
-      {showDetail && <ItemDetailModal item={item} onClose={() => setShowDetail(false)} />}
-      <div
-        style={{ border:'1px solid', borderRadius:'12px', padding:'12px', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:'10px', boxShadow:'0 1px 3px rgba(0,0,0,0.05)', transition:'box-shadow 0.15s', ...borderStyle }}
-        onClick={() => setShowDetail(true)}
-        onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; }}
-      >
-        <div style={{ width:'44px', height:'44px', borderRadius:'10px', overflow:'hidden', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background:'#f9fafb', border:'1px solid #e5e7eb' }}>
-          {item.type === 'flight' && logoSrc && !imgErr && <img src={logoSrc} alt={item.airline} style={{ width:'100%', height:'100%', objectFit:'contain' }} onError={() => setImgErr(true)} />}
-          {item.type === 'flight' && (!logoSrc || imgErr) && <span style={{ fontSize:'20px' }}>plane</span>}
-          {item.type === 'hotel'      && hotelImg && <img src={hotelImg} alt={item.hotelName || item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} onError={e => { e.target.style.display = 'none'; }} />}
-          {item.type === 'hotel'      && !hotelImg    && <span style={{ fontSize:'20px' }}>hotel</span>}
-          {item.type === 'attraction' && <span style={{ fontSize:'20px' }}>map</span>}
-          {item.type === 'other'      && <span style={{ fontSize:'20px' }}>note</span>}
-          {item.type === 'transport'  && <span style={{ fontSize:'20px' }}>car</span>}
-          {item.type === 'restaurant' && <span style={{ fontSize:'20px' }}>food</span>}
+  const TrashIcon = () => (
+    <svg width="14" height="15" viewBox="0 0 11 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 3H10M4 3V2H7V3M2 3L2.5 10.5C2.5 10.8 2.7 11 3 11H8C8.3 11 8.5 10.8 8.5 10.5L9 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 5.5V8.5M6.5 5.5V8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+
+  const renderFlightContent = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '1px solid #f1f5f9', background: '#fff' }}>
+          {logoSrc && !imgErr ? <img src={logoSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImgErr(true)} /> : <span style={{ fontSize: '24px' }}>✈️</span>}
         </div>
-
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', marginBottom:'3px' }}>
-            <span style={{ fontSize:'13px', fontWeight:700, color:'#111827', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{titleText}</span>
-            <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
-              {status === 'paid'      && <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'20px', background:'#dcfce7', color:'#16a34a' }}>Paid</span>}
-              {status === 'cancelled' && <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'20px', background:'#fee2e2', color:'#dc2626' }}>Cancelled</span>}
-              {status === 'pending'   && <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'20px', background:'#fef3c7', color:'#92400e' }}>Pending</span>}
-              {status !== 'paid' && (
-                <button onClick={e => { e.stopPropagation(); onRemove(item.id); }} style={{ width:'18px', height:'18px', borderRadius:'50%', background:'#f3f4f6', border:'none', cursor:'pointer', fontSize:'10px', color:'#6b7280', display:'flex', alignItems:'center', justifyContent:'center' }}>x</button>
-              )}
-            </div>
+        <div style={{ minWidth: '80px' }}>
+          <div style={{ fontSize: '15px', color: '#1a1a1a', fontWeight: 800 }}>{item.airline || 'AI'}</div>
+          <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{item.flightNumber || 'AI2592'}</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', fontWeight: 900 }}>{item.depTime || '16:40'}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{item.from || 'IDR'}</div>
           </div>
-          {item.type === 'flight' && <div style={{ fontSize:'11px', color:'#9ca3af', marginBottom:'5px' }}>{item.airline} {item.flightNumber}</div>}
-          {item.type === 'hotel' && item.stars && <div style={{ fontSize:'11px', color:'#9ca3af', marginBottom:'5px' }}>{'*'.repeat(Math.min(Number(item.stars), 5))} {item.address || item.cityName || ''}</div>}
-          {item.type === 'hotel' && !item.stars && (item.address || item.cityName) && <div style={{ fontSize:'11px', color:'#9ca3af', marginBottom:'5px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.address || item.cityName}</div>}
-
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'4px' }}>
-            {item.type === 'flight' && resolvedDate && <PTag bg="#fef3c7" color="#92400e">{fmtDate(resolvedDate)}</PTag>}
-            {item.type === 'flight' && (item.depTime || item.arrTime) && <PTag bg="#dbeafe" color="#1e40af">{item.depTime || '?'} - {item.arrTime || '?'}</PTag>}
-            {item.type === 'flight' && item.duration && <PTag bg="#f3f4f6" color="#374151">{item.duration}</PTag>}
-            {item.type === 'flight' && item.stops != null && <PTag bg="#f3f4f6" color="#374151">{Number(item.stops) === 0 ? 'Non-stop' : `${item.stops} stop${item.stops > 1 ? 's' : ''}`}</PTag>}
-            {item.type === 'flight' && item.price && <PTag bg="#fef9c3" color="#713f12">{fmt(item.price)}</PTag>}
-            {item.type === 'hotel'  && item.checkIn && <PTag bg="#fef3c7" color="#92400e">{fmtDate(item.checkIn)}</PTag>}
-            {item.type === 'hotel'  && item.nights  && <PTag bg="#dbeafe" color="#1e40af">{item.nights}N</PTag>}
-            {item.type === 'hotel'  && item.rating  && <PTag bg="#dcfce7" color="#166534">{item.rating}</PTag>}
-            {item.type === 'hotel'  && item.price   && <PTag bg="#fef9c3" color="#713f12">{fmt(parseFloat(item.price) * (Number(item.nights) || 1))}</PTag>}
-            {item.type === 'attraction' && item.category && <PTag bg="#f3f4f6" color="#374151">{item.category}</PTag>}
-            {item.type === 'attraction' && item.rating   && <PTag bg="#dcfce7" color="#166534">{item.rating}</PTag>}
-            {item.type === 'transport'  && item.from && item.to && <PTag bg="#f3f4f6" color="#374151">{item.from} to {item.to}</PTag>}
-            {item.type === 'transport'  && item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
-            {item.type === 'other' && item.date     && <PTag bg="#fef3c7" color="#92400e">{fmtDate(item.date)}</PTag>}
-            {item.type === 'other' && item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
-            {item.type === 'other' && item.price    && <PTag bg="#fef9c3" color="#713f12">{fmt(item.price)}</PTag>}
+          <div style={{ flex: 1, textAlign: 'center', minWidth: '80px', position: 'relative' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{item.duration || '10h 10m'}</div>
+            <div style={{ height: '1.5px', background: '#e2e8f0', width: '100%', position: 'relative' }}>
+              <span style={{ position: 'absolute', top: '-7px', left: '50%', transform: 'translateX(-50%)', background: '#fff', padding: '0 4px', fontSize: '12px' }}>✈️</span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800 }}>{item.stops === 0 ? 'Non-stop' : `${item.stops || 2} Stops`}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', fontWeight: 900 }}>{item.arrTime || '01:20'}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{item.to || 'DXB'}</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', minWidth: '100px' }}>
+          <div style={{ fontSize: '18px', fontWeight: 900 }}>{fmt(item.price || 0)}</div>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
+            <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
+              {item.type === 'other' ? (status === 'paid' ? 'PAID' : 'UNPAID') : status}
+            </span>
+            
+            {/* --- DELETE BUTTON (HIDDEN IF PAID) --- */}
+            {status !== 'paid' && (
+              <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrashIcon />
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
-}
 
+  return (
+    <div
+      draggable={status !== 'paid'} // Paid item move nahi hona chahiye (Optional)
+      onDragStart={(e) => {
+        setIsDragging(true);
+        e.dataTransfer.setData('planReorderIdx', String(itemIndex));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragEnd={() => setIsDragging(false)}
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault(); e.stopPropagation(); setIsDragOver(false);
+        const fromIdx = parseInt(e.dataTransfer.getData('planReorderIdx'));
+        if (!isNaN(fromIdx) && fromIdx !== itemIndex) onReorder(fromIdx, itemIndex);
+      }}
+      style={{ position: 'relative', marginBottom: '16px', opacity: isDragging ? 0.5 : 1, outline: isDragOver ? '2px dashed #F5A623' : 'none', borderRadius: '16px', cursor: status === 'paid' ? 'default' : 'grab' }}
+    >
+      {item.type === 'other' && (
+        <span style={{ position: 'absolute', top: '-9px', right: '12px', zIndex: 5, fontSize: '8px', fontWeight: 900, padding: '2px 10px', borderRadius: '4px', background: 'rgb(247,190,57)', color: '#1a1a1a', border: '1.5px solid #f59e0b', letterSpacing: '0.08em', textTransform: 'uppercase', boxShadow: '0 2px 6px rgba(247,190,57,0.45)', whiteSpace: 'nowrap' }}>⚡ External</span>
+      )}
+
+      {showDetail && <ItemDetailModal item={item} onClose={() => setShowDetail(false)} />}
+
+      <div style={{ border: '1.5px solid', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', ...borderStyle, overflow: 'hidden' }}>
+        <div style={{ padding: '16px' }} onClick={() => setShowDetail(true)}>
+          {item.type === 'flight' ? renderFlightContent() : (
+            <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                {item.type === 'hotel' ? '🏨' : item.type === 'attraction' ? '🗺️' : item.type === 'transfer' ? '🚗' : '📌'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#111827' }}>{titleText}</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
+                      {item.type === 'other' ? (status === 'paid' ? 'PAID' : 'UNPAID') : status}
+                    </span>
+                    
+                    {/* --- DELETE BUTTON (HIDDEN IF PAID) --- */}
+                    {status !== 'paid' && (
+                      <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <TrashIcon />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{item.address || item.cityName || item.destination}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '10px' }}>
+                  {resolvedDate && <PTag bg="#f1f5f9" color="#475569">{fmtDate(resolvedDate)}</PTag>}
+                  {(item.startTime || item.endTime) && <PTag bg="#f0f9ff" color="#0369a1">🕒 {item.startTime || ''} {item.endTime ? `- ${item.endTime}` : ''}</PTag>}
+                  {item.price && <PTag bg="#fef9c3" color="#713f12">{fmt(item.price)}</PTag>}
+                  {item.referenceId && <PTag bg="#f3f4f6" color="#6b7280">Ref: {item.referenceId}</PTag>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }} style={{ background: '#f8fafc', padding: '10px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '13px', color: noteText ? '#334155' : '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{noteText || "Add notes"}</div>
+          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#e2e8f0' }}>|</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>Photos({attachments.length})</div>
+        </div>
+      </div>
+
+      {showNotes && (
+        <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px', zIndex: 10, position: 'relative' }}>
+          <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Type notes here..." rows={3} style={{ width: '100%', fontSize: '13px', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+          <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 700, cursor: 'pointer', background: '#fff', border: '1px solid #e5e7eb', padding: '8px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>📎 Attach File <input type="file" multiple style={{ display: 'none' }} onChange={e => { const files = Array.from(e.target.files).map(f => ({ name: f.name })); setAttachments(prev => [...prev, ...files]); }} /></label>
+            <button onClick={() => setShowNotes(false)} style={{ flex: 1, background: 'rgb(247,190,57)', border: 'none', borderRadius: '10px', fontWeight: 900, color: '#1a1a1a' }}>Save Notes</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ─── BookView ──────────────────────────────────────────────────────────────────
 function BookView({ planItems, onClose, onPay, viewMode, setViewMode }) {
-  const [tab,        setTab]        = useState('selected');
-  const [partialSel, setPartialSel] = useState(
-    planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled').map(p => p.id)
-  );
-  const pendingItems  = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled');
-  const selectedItems = tab === 'selected' ? pendingItems : pendingItems.filter(p => partialSel.includes(p.id));
-  const togglePartial = (id) => setPartialSel(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const handlePay     = () => { onPay(selectedItems.map(p => p.id)); onClose(); };
+  // Sirf pending items filter karein
+  const pendingItems = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled');
+  
+  // Selection state: Shuruat mein sab selected honge
+  const [selectedIds, setSelectedIds] = useState(pendingItems.map(p => p.id));
 
-  const byType = { flight:[], hotel:[], transport:[], restaurant:[], attraction:[], other:[] };
-  pendingItems.forEach(item => { (byType[item.type] || byType.other).push(item); });
+  const toggleItem = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const isAllSelected = selectedIds.length === pendingItems.length && pendingItems.length > 0;
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]); // Sab uncheck kar do
+    } else {
+      setSelectedIds(pendingItems.map(p => p.id)); // Sab check kar do
+    }
+  };
+
+  const handlePay = () => { 
+    if (selectedIds.length === 0) return;
+    onPay(selectedIds); 
+    onClose(); 
+  };
+
+  // Grouping logic (Day-wise ya Item-wise)
   const byDate = {};
   pendingItems.forEach(item => {
-    const d  = getResolvedDate(item);
+    const d = getResolvedDate(item);
     const dk = d ? fmtDate(d) : 'No Date';
     if (!byDate[dk]) byDate[dk] = [];
     byDate[dk].push(item);
   });
-  const typeLabels = { flight:'Flights', hotel:'Hotels', transport:'Transport', restaurant:'Restaurants', attraction:'Attractions', other:'Other' };
 
   const renderItem = (item) => {
-    const isChecked = tab === 'selected' ? true : partialSel.includes(item.id);
-    const logoSrc   = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
-    const hotelImg  = item.type === 'hotel'  ? (item.image || item.imageUrl || item.photo || null) : null;
-    const rd        = getResolvedDate(item);
-    const title     = item.type === 'flight' ? `${item.fromAirport || item.from || ''} to ${item.toAirport || item.to || ''}` : item.hotelName || item.name || item.type;
+    const isChecked = selectedIds.includes(item.id);
+    const title = item.type === 'flight' ? `${item.from || ''} to ${item.to || ''}` : item.hotelName || item.name || item.type;
+    const logoSrc = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
+
     return (
-      <div key={item.id} style={{ border:'1px solid', borderRadius:'12px', padding:'12px', marginBottom:'8px', display:'flex', alignItems:'flex-start', gap:'10px', borderColor: isChecked ? '#F7BE39' : '#e5e7eb', background: isChecked ? '#fffdf5' : '#f9fafb' }}>
-        {tab === 'selected'
-          ? <div style={{ width:'20px', height:'20px', borderRadius:'6px', background:'rgb(247,190,57)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:'2px' }}><span style={{ color:'#fff', fontSize:'11px', fontWeight:900 }}>ok</span></div>
-          : <input type="checkbox" checked={isChecked} onChange={() => togglePartial(item.id)} style={{ width:'17px', height:'17px', accentColor:'rgb(247,190,57)', cursor:'pointer', flexShrink:0, marginTop:'3px' }} />
-        }
-        <div style={{ width:'34px', height:'34px', borderRadius:'8px', background:'#f9fafb', border:'1px solid #e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-          {item.type === 'flight' && logoSrc ? <img src={logoSrc} alt={item.airline} style={{ width:'100%', height:'100%', objectFit:'contain' }} onError={e => { e.target.style.display = 'none'; }} /> : item.type === 'hotel' && hotelImg ? <img src={hotelImg} alt={item.hotelName} style={{ width:'100%', height:'100%', objectFit:'cover' }} onError={e => { e.target.style.display = 'none'; }} /> : <span style={{ fontSize:'16px' }}>{item.type === 'hotel' ? 'H' : item.type === 'attraction' ? 'A' : item.type === 'transport' ? 'T' : item.type === 'other' ? 'O' : 'F'}</span>}
+      <div 
+        key={item.id} 
+        onClick={() => toggleItem(item.id)}
+        style={{ 
+          border: '1px solid', borderRadius: '12px', padding: '12px', marginBottom: '10px', 
+          display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+          borderColor: isChecked ? 'rgb(247,190,57)' : '#e5e7eb',
+          background: isChecked ? '#fffdf5' : '#fff'
+        }}
+      >
+        <input 
+          type="checkbox" 
+          checked={isChecked} 
+          onChange={() => {}} // Click div par handle ho raha hai
+          style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)', cursor: 'pointer' }} 
+        />
+        
+        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {item.type === 'flight' && logoSrc ? <img src={logoSrc} style={{ width: '100%', objectFit: 'contain' }} /> : <span>{item.type === 'hotel' ? '🏨' : '📍'}</span>}
         </div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'6px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'12px', fontWeight:700, color:'#111827', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
-            <span style={{ fontSize:'10px', fontWeight:700, padding:'2px 7px', borderRadius:'20px', background:'#fef3c7', color:'#92400e', flexShrink:0 }}>Pending</span>
-          </div>
-          {item.type === 'flight' && <div style={{ fontSize:'11px', color:'#9ca3af', marginBottom:'5px' }}>{item.airline} {item.flightNumber}</div>}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:'4px' }}>
-            {item.type === 'flight' && rd && <PTag bg="#ede9fe" color="#5b21b6">{fmtDate(rd)}</PTag>}
-            {item.type === 'flight' && (item.depTime || item.arrTime) && <PTag bg="#dbeafe" color="#1e40af">{item.depTime || '?'} - {item.arrTime || '?'}{item.nextDay ? ' (+1)' : ''}</PTag>}
-            {item.duration && <PTag bg="#f3f4f6" color="#374151">{item.duration}</PTag>}
-            {item.price    && <PTag bg="#fef9c3" color="#713f12">{item.type === 'flight' ? fmt(item.price) : fmt(parseFloat(item.price) * (Number(item.nights) || 1))}</PTag>}
-            {item.type === 'hotel' && item.checkIn && <PTag bg="#fef3c7" color="#92400e">{fmtDate(item.checkIn)}</PTag>}
-            {item.type === 'hotel' && item.nights  && <PTag bg="#dbeafe" color="#1e40af">{item.nights}N</PTag>}
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{title}</div>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>
+            {item.price ? fmt(item.price) : 'Price on request'} • {item.type.toUpperCase()}
           </div>
         </div>
       </div>
@@ -499,79 +604,54 @@ function BookView({ planItems, onClose, onPay, viewMode, setViewMode }) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', background:'#fff' }}>
-      <div style={{ padding:'12px 16px', borderBottom:'1px solid #f3f4f6', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-          <button onClick={onClose} style={{ width:'28px', height:'28px', borderRadius:'50%', background:'#f3f4f6', border:'none', cursor:'pointer', fontSize:'13px', color:'#6b7280', display:'flex', alignItems:'center', justifyContent:'center' }}>back</button>
-          <span style={{ fontSize:'13px', fontWeight:800, color:'#111827' }}>BOOK ALL ITEMS</span>
-          <span style={{ fontSize:'10px', fontWeight:700, background:'rgb(247,190,57)', color:'#1a1a1a', borderRadius:'50%', width:'20px', height:'20px', display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingItems.length}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', padding: '5px 10px', cursor: 'pointer' }}>back</button>
+          <span style={{ fontSize: '14px', fontWeight: 900 }}>BOOK ALL ITEMS</span>
         </div>
-        <div style={{ display:'flex', gap:'6px' }}>
-          {[{ v:'daywise', l:'Day-wise' }, { v:'itemwise', l:'Item-wise' }].map(opt => (
-            <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding:'4px 12px', borderRadius:'20px', fontSize:'11px', fontWeight:600, cursor:'pointer', border: viewMode === opt.v ? '2px solid #F7BE39' : '1px solid #e5e7eb', background: viewMode === opt.v ? '#fef9c3' : '#fff', color: viewMode === opt.v ? '#92400e' : '#6b7280' }}>{opt.l}</button>
+        <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '10px' }}>
+          {[{ v: 'daywise', l: 'Day-wise' }, { v: 'itemwise', l: 'Item-wise' }].map(opt => (
+            <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer', background: viewMode === opt.v ? '#fff' : 'transparent', color: viewMode === opt.v ? '#111827' : '#6b7280' }}>{opt.l}</button>
           ))}
         </div>
       </div>
-      <div style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6', flexShrink:0, display:'flex', gap:'8px' }}>
-        <button onClick={() => setTab('selected')} style={{ padding:'8px 16px', borderRadius:'20px', fontSize:'12px', fontWeight:700, cursor:'pointer', border:'none', background: tab === 'selected' ? 'rgb(247,190,57)' : '#f3f4f6', color: tab === 'selected' ? '#1a1a1a' : '#6b7280' }}>Book Selected ({pendingItems.length})</button>
-        <button onClick={() => setTab('partial')}  style={{ padding:'8px 16px', borderRadius:'20px', fontSize:'12px', fontWeight:600, cursor:'pointer', border:'1px solid #e5e7eb', background:'#fff', color:'#374151' }}>Book Partially</button>
-      </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
-        {viewMode === 'daywise'
-          ? Object.entries(byDate).map(([dk, items]) => (
-              <div key={dk}><SectionDivider label={`${dk} (${items.length})`} />{items.map(renderItem)}</div>
-            ))
-          : Object.entries(byType).map(([type, items]) =>
-              items.length === 0 ? null : (
-                <div key={type}><SectionDivider label={typeLabels[type] || type} />{items.map(renderItem)}</div>
-              )
-            )
-        }
-      </div>
-      <div style={{ padding:'12px 16px 16px', borderTop:'1px solid #f3f4f6', flexShrink:0, display:'flex', flexDirection:'column', gap:'8px' }}>
-        <button onClick={handlePay} disabled={selectedItems.length === 0}
-          style={{ width:'100%', padding:'14px', background: selectedItems.length > 0 ? 'rgb(247,190,57)' : '#e5e7eb', color: selectedItems.length > 0 ? '#1a1a1a' : '#9ca3af', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:800, cursor: selectedItems.length > 0 ? 'pointer' : 'not-allowed' }}>
-          Pay for {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''}
-        </button>
-        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'none', border:'1px solid #e5e7eb', borderRadius:'10px', fontSize:'12px', color:'#6b7280', cursor:'pointer' }}>Back to plan</button>
-      </div>
-    </div>
-  );
-}
 
-// ─── OtherTab ──────────────────────────────────────────────────────────────────
-function OtherTab({ onAddToPlan }) {
-  const [form, setForm] = useState({ activity:'', moneySpent:'', time:'', date:'' });
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.activity.trim()) return;
-    onAddToPlan({ id:'other_' + Date.now(), type:'other', name:form.activity, price:form.moneySpent, duration:form.time, date:form.date });
-    setForm({ activity:'', moneySpent:'', time:'', date:'' });
-  };
-  const inp = (label, key, type, placeholder) => (
-    <div style={{ marginBottom:'12px' }} key={key}>
-      <label style={{ display:'block', fontSize:'11px', fontWeight:700, color:'#374151', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'5px' }}>{label}</label>
-      <input type={type} value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
-        style={{ width:'100%', fontSize:'13px', border:'1px solid #e5e7eb', borderRadius:'9px', padding:'8px 11px', outline:'none', boxSizing:'border-box', color:'#111827' }}
-        onFocus={e => { e.target.style.borderColor = 'rgb(247,190,57)'; }}
-        onBlur={e  => { e.target.style.borderColor = '#e5e7eb'; }}
-      />
-    </div>
-  );
-  return (
-    <div style={{ padding:'16px' }}>
-      <div style={{ marginBottom:'16px' }}>
-        <div style={{ fontSize:'15px', fontWeight:800, color:'#111827', marginBottom:'2px' }}>Add Activity</div>
-        <div style={{ fontSize:'11px', color:'#9ca3af' }}>Add custom activities with details</div>
+      {/* Select All Toolbar */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#374151' }}>
+          <input 
+            type="checkbox" 
+            checked={isAllSelected} 
+            onChange={handleSelectAll} 
+            style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)' }} 
+          />
+          Select All ({pendingItems.length})
+        </label>
+        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{selectedIds.length} items selected</span>
       </div>
-      <div style={{ background:'#fff', borderRadius:'12px', border:'1px solid #e5e7eb', padding:'16px' }}>
-        <form onSubmit={handleSubmit}>
-          {inp('Activity', 'activity',   'text',   'Enter activity name')}
-          {inp('Money Spent', 'moneySpent', 'number', 'Enter amount')}
-          {inp('Time',      'time',       'text',   'e.g. 2 hours')}
-          {inp('Date',      'date',       'date',   '')}
-          <button type="submit" style={{ width:'100%', padding:'11px', background:'rgb(247,190,57)', color:'#1a1a1a', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:800, cursor:'pointer', marginTop:'4px' }}>Add to Plan</button>
-        </form>
+
+      {/* List Area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '15px 20px' }}>
+        {Object.entries(byDate).map(([dateLabel, items]) => (
+          <div key={dateLabel}>
+            <SectionDivider label={dateLabel} />
+            {items.map(renderItem)}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6', background: '#fff' }}>
+        <button 
+          onClick={handlePay} 
+          disabled={selectedIds.length === 0}
+          style={{ width: '100%', padding: '14px', background: selectedIds.length > 0 ? 'rgb(247,190,57)' : '#e5e7eb', color: '#1a1a1a', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 900, cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed', marginBottom: '10px' }}
+        >
+          Pay for {selectedIds.length} Item{selectedIds.length !== 1 ? 's' : ''}
+        </button>
+        <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}>Back to plan</button>
       </div>
     </div>
   );
@@ -608,46 +688,184 @@ function EmptyState({ icon, message }) {
 
 // ─── Destination Dropdown Filter ──────────────────────────────────────────────
 function DestDropdown({ destinations, selected, onChange }) {
-  if (!destinations || destinations.length <= 1) return null;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const ref = useRef(null);
+
+  // Outside click se band hoga
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setSearchOpen(false);
+        setSearchText('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  if (!destinations || destinations.length === 0) return null;
+
+  const filtered = searchText
+    ? CITIES.filter(c => c.toLowerCase().includes(searchText.toLowerCase()))
+    : [];
+
   return (
-    <select
-      value={selected}
-      onChange={e => onChange(e.target.value)}
-      style={{ padding:'6px 10px', border:'1px solid #e5e7eb', borderRadius:'8px', fontSize:'11px', fontWeight:600, color:'#374151', background:'#fff', cursor:'pointer', outline:'none', maxWidth:'160px' }}
-    >
-      <option value="">All Destinations</option>
-      {destinations.map((d, i) => <option key={i} value={d}>{d}</option>)}
-    </select>
+    <div ref={ref} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', overflow: 'visible' }}>
+     {destinations.map((d, i) => (
+        <button
+          key={i}
+          onClick={() => onChange(selected === d ? '' : d)}
+          style={{
+            padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            border: selected === d ? '2px solid rgb(247,190,57)' : '1px solid #e5e7eb',
+            background: selected === d ? '#fef9c3' : '#fff',
+            color: selected === d ? '#92400e' : '#374151',
+          }}
+        >
+          {d}
+        </button>
+      ))}
+
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <button
+          onClick={() => { setSearchOpen(v => !v); setSearchText(''); }}
+          style={{
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+            background: searchOpen ? 'rgb(247,190,57)' : '#f3f4f6',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke={searchOpen ? '#fff' : '#6b7280'} strokeWidth="2"/>
+            <path d="M16.5 16.5L21 21" stroke={searchOpen ? '#fff' : '#6b7280'} strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
+
+        {searchOpen && (
+          <div style={{
+            position: 'absolute', top: '32px', right: '0', zIndex: 9999,
+            background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px',
+            padding: '10px', width: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+          }}>
+            <input
+              autoFocus
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Search city..."
+              style={{
+                width: '100%', fontSize: '12px', border: '1px solid #e5e7eb',
+                borderRadius: '8px', padding: '6px 10px', outline: 'none',
+                boxSizing: 'border-box', marginBottom: '6px',
+              }}
+              onFocus={e => { e.target.style.borderColor = 'rgb(247,190,57)'; }}
+              onBlur={e => { e.target.style.borderColor = '#e5e7eb'; }}
+            />
+            {!searchText ? (
+              <div style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '6px 0' }}>
+                Type to search cities...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '6px 0' }}>
+                No results
+              </div>
+            ) : (
+              <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                {filtered.map((d, i) => (
+                  <div
+                    key={i}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      onChange(d);
+                      setSearchOpen(false);
+                      setSearchText('');
+                    }}
+                    style={{
+                      fontSize: '12px', fontWeight: 600, padding: '7px 10px',
+                      borderRadius: '8px', cursor: 'pointer', color: '#374151',
+                      background: selected === d ? '#fef9c3' : 'transparent',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = selected === d ? '#fef9c3' : 'transparent'; }}
+                  >
+                    📍 {d}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
-
 // ─── FilteredView ─────────────────────────────────────────────────────────────
 function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planIds }) {
   const [selectedDest, setSelectedDest] = useState('');
+  const [extraDestData, setExtraDestData] = useState([]);
 
   const allDestNames = rfq.destinations?.map(d => d.destination).filter(Boolean) || [];
 
+  const handleDestChange = (dest) => {
+    setSelectedDest(prev => prev === dest ? '' : dest);
+    if (dest && !allDestData.some(dd => dd.destination === dest)
+             && !extraDestData.some(dd => dd.destination === dest)) {
+      setExtraDestData(prev => [...prev, {
+        destination: dest,
+        hotels: Array.from({ length: 6 }, (_, i) => ({
+          hotelId: `SEARCH_${i}`,
+          name: `${['Grand ','Royal ','City ','Park ','Central ','Premier '][i]}Hotel ${dest.split(',')[0]}`,
+          cityName: dest,
+          stars: [3,4,5,4,3,5][i] || 3,
+          address: dest,
+          rating: (4.0 + Math.random() * 0.9).toFixed(1),
+          price: Math.floor(2000 + Math.random() * 8000),
+          currency: 'INR',
+          available: true,
+        })),
+        attractions: Array.from({ length: 6 }, (_, i) => ({
+          attractionId: `SEARCH_ATT_${i}`,
+          name: `${['Museum of ','Historic ','Central Park ','Art Gallery ','Old Town ','Monument '][i]}${dest.split(',')[0]}`,
+          cityName: dest,
+          category: ['Museum','Landmark','Park','Art Gallery','Historic Site','Monument'][i],
+          address: dest,
+          rating: (4.0 + Math.random() * 0.9).toFixed(1),
+          available: true,
+        })),
+      }]);
+    }
+  };
+
+  const combinedDestData = [...allDestData, ...extraDestData];
+  const allCombinedNames = combinedDestData.map(dd => dd.destination).filter(Boolean);
+
   const filteredDestData = selectedDest
-    ? allDestData.filter(dd => dd.destination === selectedDest)
-    : allDestData;
+    ? combinedDestData.filter(dd => dd.destination === selectedDest)
+    : combinedDestData;
 
-  if (filter === 'flights') return <FlightsTab rfq={rfq} planItems={planItems} onAddToPlan={onAddToPlan} selectedDest={selectedDest} />;
+  // ── YE FLIGHTS BLOCK ADD KARO ──
+  if (filter === 'flights') return (
+    <FlightsTab rfq={rfq} planItems={planItems} onAddToPlan={onAddToPlan} selectedDest={selectedDest} />
+  );
 
+  // ── YE HOTELS BLOCK ADD KARO ──
   if (filter === 'hotels') {
     const has = filteredDestData.some(dd => dd.hotels?.length > 0);
     return (
       <div className="p-4">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
-          <TabHeader title="Available Hotels" subtitle="Click + to add to your plan" />
-          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
-        </div>
-        {!has ? <EmptyState icon="hotel" message="No hotel data." /> : filteredDestData.map((dd, di) => {
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', flexWrap:'wrap', gap:'8px' }}>
+  <TabHeader title="Available Hotels" subtitle="Click + to add to your plan" />
+  <DestDropdown destinations={allCombinedNames} selected={selectedDest} onChange={handleDestChange} />
+</div>
+         
+        {!has ? <EmptyState icon="🏨" message="No hotel data." /> : filteredDestData.map((dd, di) => {
           const hotels = (dd.hotels || []).filter(Boolean);
           if (!hotels.length) return null;
           return (
             <DestSection key={di} index={di} name={dd.destination}>
               {hotels.map((hotel, hi) => {
-                const id = 'hotel_' + (hotel.hotelId || hi) + '_' + di;
+                const id = `hotel_${hotel.hotelId || hi}_${dd.destination}`; 
                 return <HotelCard key={hi} hotel={hotel} inPlan={planIds.includes(id)} onAdd={h => onAddToPlan({ ...h, type:'hotel', id })} />;
               })}
             </DestSection>
@@ -657,13 +875,16 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
     );
   }
 
+ 
+ 
+
   if (filter === 'attractions') {
     const has = filteredDestData.some(dd => dd.attractions?.length > 0);
     return (
       <div className="p-4">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
           <TabHeader title="Attractions" subtitle="Click + to add to your plan" />
-          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
+          <DestDropdown destinations={allCombinedNames} selected={selectedDest} onChange={handleDestChange} />
         </div>
         {!has ? <EmptyState icon="map" message="No attractions found." /> : filteredDestData.map((dd, di) => {
           const atts = (dd.attractions || []).filter(Boolean);
@@ -671,7 +892,7 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
           return (
             <DestSection key={di} index={di} name={dd.destination}>
               {atts.map((a, ai) => {
-                const id = 'attraction_' + (a.attractionId || ai) + '_' + di;
+                const id = `attraction_${a.attractionId || ai}_${dd.destination}`;
                 return <AttractionCard key={ai} attraction={a} inPlan={planIds.includes(id)} onAdd={() => onAddToPlan({ ...a, type:'attraction', id })} />;
               })}
             </DestSection>
@@ -681,7 +902,7 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
     );
   }
 
-  if (filter === 'transport') {
+  if (filter === 'transfer') {
     const mainDest = selectedDest || rfq.destinations?.[0]?.destination || 'destination';
     const opts = [
       { id:'cab',    type:'Cab / Taxi',    provider:'Uber / Local Taxi',          from:'Airport',          to:'City Centre',   duration:'30-60 min', price:'Varies',          recommended:true  },
@@ -692,13 +913,13 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
     return (
       <div className="p-4">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
-          <TabHeader title="Transport Options" subtitle={`Local transport in ${mainDest}`} />
-          <DestDropdown destinations={allDestNames} selected={selectedDest} onChange={setSelectedDest} />
+          <TabHeader title="Transfer Options" subtitle={`Local transfer in ${mainDest}`} />
+          <DestDropdown destinations={allCombinedNames} selected={selectedDest} onChange={handleDestChange} />
         </div>
         <div className="flex flex-col gap-3">
           {opts.map(opt => {
             const id = 'transport_' + opt.id;
-            return <TransportCard key={opt.id} option={opt} inPlan={planIds.includes(id)} onAdd={o => onAddToPlan({ ...o, type:'transport', id })} />;
+            return <TransportCard key={opt.id} option={opt} inPlan={planIds.includes(id)} onAdd={o => onAddToPlan({ ...o, type:'transfer', id })} />;
           })}
         </div>
       </div>
@@ -710,7 +931,42 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
 }
 
 // ─── DestinationTimeline (Panel 2 — Premium Travel Timeline) ─────────────────
-function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan, viewMode, setViewMode, setShowBookView, setActiveFilter, startDate }) {
+function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan, viewMode, setViewMode, setShowBookView, setActiveFilter, startDate,addToPlan,reorderPlan }) {
+  // DestinationTimeline ke andar sabse upar (Line 689 ke paas)
+// DestinationTimeline function ke shuruat mein (Line 689 ke paas)
+const summaryConfig = [
+  { type: 'flight',     label: 'Flights',    icon: '✈️' },
+  { type: 'hotel',      label: 'Hotels',     icon: '🏨' },
+  { type: 'attraction', label: 'Activities', icon: '🗺️' },
+  { type: 'transfer',  label: 'Transfers',  icon: '🚗' },
+  { type: 'other',      label: 'Other',      icon: '📎' },
+];
+
+// Sirf wahi items filter karo jo planItems mein maujood hain
+const activeItems = summaryConfig.filter(cfg => 
+  planItems.some(item => item.type === cfg.type)
+);
+   const handleDragOver = (e) => {
+    e.preventDefault();
+    e.currentTarget.style.backgroundColor = "#fffbeb"; // Visual feedback (light yellow)
+  };
+  const handleDragLeave = (e) => {
+    e.currentTarget.style.backgroundColor = "#fafafa"; // Reset color
+  };
+   const handleDrop = (e) => {
+    e.preventDefault();
+    e.currentTarget.style.backgroundColor = "#fafafa";
+    try {
+      const data = e.dataTransfer.getData("itemData");
+      if (data) {
+        const item = JSON.parse(data);
+        addToPlan(item); // Plan mein add kar dega
+      }
+    } catch (err) {
+      console.error("Drop Error:", err);
+    }
+  };
+const [itemFilter, setItemFilter] = useState('');
   const getSortedItemsForDest = (dest) => {
     const items = planItems.filter(item => getItemDestination(item, destNames) === dest);
     return items.sort((a, b) => {
@@ -740,65 +996,123 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
   });
 
   // Calculate baseline using the trip's official start date
-  const tripBaseline = startDate ? new Date(startDate + (startDate.includes('T') ? '' : 'T00:00:00')) : null;
+  const planDates = planItems
+  .map(item => getResolvedDate(item))
+  .filter(d => d && d !== 'No Date')
+  .sort();
+
+const earliestItemDate = planDates.length > 0 ? planDates[0] : null;
+
+// अगर प्लान में आइटम है, तो उसकी तारीख को "Day 1" का बेसलाइन मानें, 
+// वरना फॉर्म की startDate को यूज करें।
+const baseDateStr = earliestItemDate || startDate;
+const tripBaseline = baseDateStr ? new Date(baseDateStr + (baseDateStr.includes('T') ? '' : 'T00:00:00')) : null;
  
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
 
-      {/* ── Sticky Header ── */}
-      <div style={{
-        padding: '12px 20px',
-        borderBottom: '1px solid #f3f4f6',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: '#fff',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        boxShadow: '0 1px 0 #f3f4f6',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 900, color: '#111827', letterSpacing: '0.03em' }}>PLAN SUMMARY</span>
-          {planItems.length > 0 && (
-            <span style={{
-              fontSize: '10px', fontWeight: 800,
-              background: 'rgb(247,190,57)', color: '#1a1a1a',
-              borderRadius: '20px', padding: '2px 10px',
-              letterSpacing: '0.04em',
-            }}>
-              {planItems.length} {planItems.length === 1 ? 'PLAN' : 'PLANS'}
-            </span>
+
+      {/* ── Sticky Header (Updated to 5 Icons Style) ── */}
+{/* ── Sticky Header (Dynamic & No Counting) ── */}
+<div style={{
+  padding: '16px 20px',
+  borderBottom: '1px solid #f3f4f6',
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center', 
+  justifyContent: 'space-between',
+  background: '#fff',
+  position: 'sticky',
+  top: 0,
+  zIndex: 10,
+}}>
+  <div>
+    <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#111827', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+      Trip Summary
+    </h2>
+    
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+      {activeItems.map((item, index) => (
+        <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#6b7280', fontSize: '12px', fontWeight: 600 }}>
+            <span style={{ fontSize: '14px' }}>{item.icon}</span>
+            <span>{item.label}</span>
+          </div>
+          {/* Separator sirf tab dikhao jab aage aur items hon */}
+          {index < activeItems.length - 1 && (
+            <span style={{ color: '#e5e7eb', marginLeft: '2px' }}>|</span>
           )}
         </div>
-        <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '12px' }}>
-          {[{ label: 'Day-wise', value: 'daywise' }, { label: 'Item-wise', value: 'itemwise' }].map(opt => {
-            const active = viewMode === opt.value;
+      ))}
+      
+      {/* Agar plan khali hai toh empty text (Optional) */}
+      {activeItems.length === 0 && (
+        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>No items added to plan</span>
+      )}
+    </div>
+  </div>
+
+  {/* Right Side: Day-wise / Item-wise Switcher */}
+  <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '12px' }}>
+    {[{ label: 'Day-wise', value: 'daywise' }, { label: 'Item-wise', value: 'itemwise' }].map(opt => {
+      const active = viewMode === opt.value;
+      return (
+        <button
+          key={opt.value}
+          onClick={() => setViewMode(opt.value)}
+          style={{
+            padding: '6px 15px', borderRadius: '9px', fontSize: '11px', fontWeight: 700,
+            cursor: 'pointer', border: 'none', background: active ? '#fff' : 'transparent',
+            color: active ? '#111827' : '#6b7280', boxShadow: active ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+            transition: 'all 0.18s',
+          }}
+        >
+          {opt.label}
+        </button>
+      );
+    })}
+  </div>
+</div>
+{/* ── Item-wise Filter Tabs (sirf itemwise mode mein dikhao) ── */}
+    {viewMode === 'itemwise' && (
+        <div style={{
+          display: 'flex', gap: '6px', padding: '10px 20px',
+          borderBottom: '1px solid #f3f4f6',
+          background: '#fff', flexShrink: 0,
+          overflowX: 'auto',
+        }}>
+          {[
+            { type: 'flight',     label: '✈️ Flights'     },
+            { type: 'hotel',      label: '🏨 Hotels'      },
+            { type: 'attraction', label: '🗺️ Attractions'  },
+            { type: 'transfer',  label: '🚗 Transfer'   },
+            { type: 'other',      label: '📌 Other'       },
+          ].map(({ type, label }) => {
+            const count = planItems.filter(i => i.type === type).length;
+            if (!count) return null;
+            const isActive = itemFilter === type;
             return (
-              <button
-                key={opt.value}
-                onClick={() => setViewMode(opt.value)}
-                style={{
-                  padding: '6px 15px', borderRadius: '9px',
-                  fontSize: '11px', fontWeight: 700,
-                  cursor: 'pointer', border: 'none',
-                  background: active ? '#fff' : 'transparent',
-                  color: active ? '#111827' : '#6b7280',
-                  boxShadow: active ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.18s',
-                }}
-              >
-                {opt.label}
+              <button key={type} onClick={() => setItemFilter(isActive ? '' : type)} style={{
+                padding: '5px 14px', borderRadius: '20px', fontSize: '11px',
+                fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                border: isActive ? '2px solid rgb(247,190,57)' : '1px solid #e5e7eb',
+                background: isActive ? '#fef9c3' : '#f9fafb',
+                color: isActive ? '#92400e' : '#374151',
+              }}>
+                {label}
               </button>
             );
           })}
         </div>
-      </div>
+      )}
 
       {/* ── Scrollable Timeline Body ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fafafa' }}>
+      <div 
+       onDragOver={handleDragOver}   // <--- Add this
+        onDragLeave={handleDragLeave} // <--- Add this
+        onDrop={handleDrop} 
+        style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fafafa' }}>
 
        {planItems.length === 0 ? (
           /* Empty State */
@@ -811,18 +1125,10 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
           </div>
         ) : viewMode === 'daywise' ? (
 
-          /* ══ DAY-WISE VIEW (Fixed Day Logic) ══ */
+          /* ══ NAYA DAY-WISE VIEW (Image 1 & 2 Style) ══ */
           <div style={{ position: 'relative' }}>
-            {/* Global vertical line */}
-            <div style={{
-              position: 'absolute', left: '15px', top: '20px', bottom: '0',
-              width: '2px',
-              background: 'linear-gradient(to bottom, #F7BE39 0%, #e5e7eb 30%, #e5e7eb 100%)',
-              zIndex: 0,
-            }} />
-
             {sortedDayEntries.map(([rawDate, items], gi) => {
-              // Logic: Day number = difference between current date and start date + 1
+              // Din ki counting
               let currentDayNum = gi + 1; 
               let displayHeaderDate = rawDate === 'No Date' ? 'Unscheduled' : fmtDate(rawDate);
 
@@ -833,46 +1139,57 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
                 currentDayNum = diffDays + 1;
               }
 
+              // City Name nikalna header ke liye
+              const dayCity = getItemDestination(items[0], destNames) || "Destination";
+              
+              // Counts nikalna header ke right side ke liye
+              const hCount = items.filter(i => i.type === 'hotel').length;
+              const tCount = items.filter(i => i.type === 'transfer' || i.type === 'flight').length;
+              const aCount = items.filter(i => i.type === 'attraction' || i.type === 'other').length;
+
               return (
-                <div key={rawDate} style={{ marginBottom: '28px', position: 'relative' }}>
-                  {/* Date Header with Circle Icon */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                    <div style={{
-                      width: '32px', height: '32px', flexShrink: 0,
-                      background: 'linear-gradient(135deg, #F7BE39, #f59e0b)',
-                      borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#fff', fontSize: '11px', fontWeight: 900,
-                      boxShadow: '0 4px 10px rgba(247,190,57,0.35)',
-                      zIndex: 1, position: 'relative',
-                    }}>
-                      {rawDate === 'No Date' ? '?' : currentDayNum}
-                    </div>
-
+                <div key={rawDate} style={{ 
+                  marginBottom: '20px', background: '#fff', borderRadius: '12px', 
+                  border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' 
+                }}>
+                  {/* --- Day Header --- */}
+                  <div style={{ padding: '12px 18px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgb(247,190,57)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        {rawDate === 'No Date' ? 'No Date' : 'Day ' + currentDayNum}
-                      </div>
-                      <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827' }}>{displayHeaderDate}</div>
+                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#111827' }}>Day {currentDayNum} - {dayCity}</span>
+                      <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>{displayHeaderDate}</div>
                     </div>
-
-                    <div style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 700, color: '#9ca3af', background: '#f3f4f6', padding: '3px 10px', borderRadius: '20px' }}>
-                      {items.length} item{items.length !== 1 ? 's' : ''}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {aCount > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>{aCount} 🗺️</span>}
+                      {hCount > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>{hCount} 🏨</span>}
+                      {tCount > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>{tCount} 🚗</span>}
                     </div>
                   </div>
 
-                  {/* Cards under this day */}
-                  <div style={{ marginLeft: '44px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {items.map(item => (
-                      <div key={item.id} style={{ position: 'relative' }}>
-                        <div style={{
-                          position: 'absolute', left: '-29px', top: '22px',
-                          width: '10px', height: '10px', borderRadius: '50%',
-                          background: '#fff', border: '3px solid rgb(247,190,57)',
-                          zIndex: 2, flexShrink: 0,
-                        }} />
-                        <PlanCard item={item} onRemove={removeFromPlan} />
-                      </div>
-                    ))}
+                  {/* --- Day Content --- */}
+                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {items.map((item) => {
+                      const isLeisure = item.name?.toLowerCase().includes('leisure');
+                      const isMeal = item.name?.toLowerCase().includes('breakfast') || item.type === 'restaurant';
+
+                      if (isLeisure) {
+                        return (
+                          <div key={item.id} style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '16px' }}>🍃</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e' }}>{item.name}</span>
+                          </div>
+                        );
+                      }
+                      if (isMeal) {
+                        return (
+                          <div key={item.id} style={{ padding: '10px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px' }}>☕</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#4b5563' }}>{item.name}</span>
+                          </div>
+                        );
+                      }
+                      return <PlanCard key={item.id} item={item} onRemove={removeFromPlan}
+  itemIndex={planItems.indexOf(item)} onReorder={reorderPlan} />;
+                    })}
                   </div>
                 </div>
               );
@@ -880,157 +1197,79 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
           </div>
 
         ) : (
-          /* ══ ITEM-WISE / DESTINATION-WISE VIEW (Yahan se aapka code as it is rahega) ══ */
+   
+   /* ══ ITEM-WISE VIEW — Type-wise grouped, Day-wise UI style ══ */
+          <div style={{ position: 'relative' }}>
+            {(() => {
+              const TYPE_CONFIG = [
+                { type: 'flight',     label: 'Flights',     icon: '✈️' },
+                { type: 'hotel',      label: 'Hotels',      icon: '🏨' },
+                { type: 'attraction', label: 'Attractions', icon: '🗺️' },
+                { type: 'transfer',  label: 'Transfer',   icon: '🚗' },
+                { type: 'other',      label: 'Other',       icon: '📌' },
+              ];
 
-          <div>
-            {destNames.map((dest, dIdx) => {
-              const sortedItems = getSortedItemsForDest(dest);
-              const hasHotel    = sortedItems.some(i => i.type === 'hotel');
-              const isLast      = dIdx === destNames.length - 1;
+              return TYPE_CONFIG.map(({ type, label, icon }) => {
+             const items = planItems.filter(i => i.type === type && (itemFilter === '' || itemFilter === type));
+                if (!items.length) return null;
 
-              return (
-                <div key={dest} style={{ marginBottom: isLast ? '8px' : '0', position: 'relative' }}>
-                  <div style={{
-                    position: 'absolute',
-                    left: '17px',
-                    top: '52px',
-                    bottom: isLast ? '0' : '-32px',
-                    width: '2px',
-                    background: isLast
-                      ? 'linear-gradient(to bottom, #e5e7eb 60%, transparent 100%)'
-                      : '#e5e7eb',
-                    zIndex: 0,
-                  }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                return (
+                  <div key={type} style={{
+                    marginBottom: '20px',
+                    background: '#fff',
+                    borderRadius: '12px',
+                    border: '1px solid #e5e7eb',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                  }}>
+                    {/* --- Type Header (Day-wise style) --- */}
                     <div style={{
-                      width: '36px', height: '36px', flexShrink: 0,
-                      background: 'linear-gradient(135deg, #F7BE39, #f59e0b)',
-                      borderRadius: '12px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#fff', fontSize: '16px', fontWeight: 900,
-                      boxShadow: '0 4px 14px rgba(247,190,57,0.38)',
-                      zIndex: 1, position: 'relative',
+                      padding: '12px 18px',
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}>
-                      {dIdx + 1}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgb(247,190,57)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '2px' }}>
-                        Stage {dIdx + 1}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '16px' }}>{icon}</span>
+                        <span style={{ fontSize: '15px', fontWeight: 800, color: '#111827' }}>{label}</span>
                       </div>
-                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#111827', lineHeight: 1.1 }}>{dest}</div>
-                    </div>
-                    {sortedItems.length > 0 && (
                       <div style={{
-                        fontSize: '10px', fontWeight: 700, color: '#6b7280',
+                        fontSize: '11px', fontWeight: 700, color: '#6b7280',
                         background: '#f3f4f6', padding: '3px 10px', borderRadius: '20px',
                       }}>
-                        {sortedItems.length} item{sortedItems.length !== 1 ? 's' : ''}
+                        {items.length} item{items.length !== 1 ? 's' : ''}
                       </div>
-                    )}
-                  </div>
-                  <div style={{ marginLeft: '50px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', marginBottom: '16px' }}>
-                    {sortedItems.length > 0 ? (
-                      sortedItems.map(item => (
-                        <div key={item.id} style={{ position: 'relative' }}>
-                          <div style={{
-                            position: 'absolute',
-                            left: '-33px', top: '22px',
-                            width: '10px', height: '10px', borderRadius: '50%',
-                            background: '#fff', border: '3px solid rgb(247,190,57)',
-                            zIndex: 2,
-                          }} />
-                          <PlanCard item={item} onRemove={removeFromPlan} />
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{
-                        padding: '20px 16px',
-                        border: '2px dashed #e5e7eb',
-                        borderRadius: '14px',
-                        textAlign: 'center',
-                        background: '#fff',
-                      }}>
-                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>📍</div>
-                        <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, marginBottom: '10px' }}>
-                          No activities added for {dest} yet.
-                        </p>
-                        <button
-                          onClick={() => setActiveFilter('hotels')}
-                          style={{
-                            fontSize: '11px', fontWeight: 800, color: 'rgb(247,190,57)',
-                            background: '#fffbeb', border: '1px solid #fef3c7',
-                            borderRadius: '8px', padding: '5px 14px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Explore Hotels +
-                        </button>
-                      </div>
-                    )}
-                    {!hasHotel && sortedItems.length > 0 && (
-                      <div style={{
-                        padding: '10px 14px',
-                        background: '#fffbeb',
-                        border: '1px solid #fef3c7',
-                        borderRadius: '12px',
-                        display: 'flex', alignItems: 'flex-start', gap: '10px',
-                      }}>
-                        <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>💡</span>
-                        <div>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#92400e', marginBottom: '2px' }}>Suggestion</div>
-                          <div style={{ fontSize: '11px', color: '#92400e', opacity: 0.85 }}>
-                            You haven't added a hotel for your stay in <strong>{dest}</strong>.
-                          </div>
-                          <button
-                            onClick={() => setActiveFilter('hotels')}
-                            style={{
-                              marginTop: '6px', fontSize: '10px', fontWeight: 700,
-                              color: '#92400e', background: 'none', border: 'none',
-                              cursor: 'pointer', padding: '0', textDecoration: 'underline',
-                            }}
-                          >
-                            Add hotel →
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {dIdx < destNames.length - 1 && (
-                    <div style={{
-                      marginLeft: '50px',
-                      marginBottom: '28px',
-                      padding: '10px 14px',
-                      background: '#f3f4f6',
-                      borderRadius: '10px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      border: '1px solid #e5e7eb',
-                    }}>
-                      <span style={{ fontSize: '14px' }}>✈️</span>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
-                        Moving from <strong style={{ color: '#374151' }}>{dest}</strong> to <strong style={{ color: '#374151' }}>{destNames[dIdx + 1]}</strong>
-                      </span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {unmatchedItems.length > 0 && (
-              <div style={{ marginTop: '8px' }}>
-                <SectionDivider label="Other Items" />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                  {unmatchedItems.map(item => (
-                    <PlanCard key={item.id} item={item} onRemove={removeFromPlan} />
-                  ))}
-                </div>
-              </div>
-            )}
+
+                    {/* --- Items --- */}
+                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {items.map((item) => (
+                        <PlanCard
+                          key={item.id}
+                          item={item}
+                          onRemove={removeFromPlan}
+                          itemIndex={planItems.indexOf(item)}
+                          onReorder={reorderPlan}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
+          
+        
+         
+        
+        
       </div>
 
       {/* ── Sticky Footer ── */}
+     {/* ── Sticky Footer (Fixed & Centered) ── */}
       {planItems.length > 0 && (
         <div style={{
           padding: '16px 20px 20px',
@@ -1039,19 +1278,18 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
           boxShadow: '0 -4px 24px rgba(0,0,0,0.04)',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>
-                Estimated Total
-              </div>
-              <div style={{ fontSize: '24px', fontWeight: 900, color: '#111827', letterSpacing: '-0.01em' }}>
-                {fmt(grandTotal)}
-              </div>
-            </div>
+          {/* Row 1: Book Now aur Price (Padding 60px se center ki taraf aayenge) */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            marginBottom: '12px',
+            padding: '0 60px' // <--- Isse dono center ki taraf aayenge
+          }}>
             <button
               onClick={() => setShowBookView(true)}
               style={{
-                padding: '14px 32px',
+                padding: '14px 40px',
                 background: 'rgb(247,190,57)',
                 color: '#1a1a1a',
                 border: 'none',
@@ -1060,55 +1298,37 @@ function DestinationTimeline({ planItems, destNames, grandTotal, removeFromPlan,
                 fontWeight: 900,
                 cursor: 'pointer',
                 boxShadow: '0 4px 18px rgba(247,190,57,0.38)',
-                transition: 'transform 0.18s, box-shadow 0.18s',
-                display: 'flex', alignItems: 'center', gap: '6px',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'scale(1.03)';
-                e.currentTarget.style.boxShadow = '0 6px 24px rgba(247,190,57,0.5)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 18px rgba(247,190,57,0.38)';
               }}
             >
-              <span>BOOK NOW</span>
-              
+              BOOK NOW
             </button>
+
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Estimated Total
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#111827' }}>
+                {fmt(grandTotal)}
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button style={{
-              flex: 1, padding: '10px',
-              background: '#fff', border: '1px solid #e5e7eb',
-              borderRadius: '12px', fontSize: '12px', fontWeight: 700,
-              color: '#6b7280', cursor: 'pointer',
-              transition: 'background 0.15s',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
-            >
+
+          {/* Row 2: Bottom Buttons (Review/Manual) */}
+          <div style={{ display: 'flex', gap: '12px', padding: '0 60px' }}>
+            <button style={{ flex: 1, padding: '10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', fontSize: '12px', fontWeight: 700, color: '#6b7280', cursor: 'pointer' }}>
               Send to review
             </button>
-            <button style={{
-              flex: 1, padding: '10px',
-              background: '#fff', border: '1px solid #e5e7eb',
-              borderRadius: '12px', fontSize: '12px', fontWeight: 700,
-              color: '#6b7280', cursor: 'pointer',
-              transition: 'background 0.15s',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
-            >
+            <button style={{ flex: 1, padding: '10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', fontSize: '12px', fontWeight: 700, color: '#6b7280', cursor: 'pointer' }}>
               Manual send
             </button>
           </div>
         </div>
       )}
-    </div>
+    </div> // Main div closing
   );
 }
 
-// ─── ResizerHandle ────────────────────────────────────────────────────────────
+// ─── ResizerHandle (Isse hamesha component ke bahar rakho) ───
 function ResizerHandle({ onMouseDown, visible = true }) {
   const [hovered, setHovered] = useState(false);
   if (!visible) return null;
@@ -1123,7 +1343,6 @@ function ResizerHandle({ onMouseDown, visible = true }) {
         cursor: 'col-resize',
         background: hovered ? 'rgb(247,190,57)' : 'transparent',
         borderLeft: `1px solid ${hovered ? 'rgb(247,190,57)' : '#e5e7eb'}`,
-        borderRight: `1px solid ${hovered ? 'rgb(247,190,57)' : '#e5e7eb'}`,
         transition: 'background 0.15s, border-color 0.15s',
         position: 'relative',
         zIndex: 20,
@@ -1304,10 +1523,27 @@ const journeyCities = useMemo(() => {
       if (c) cities.add(c);
     }
   });
+    // 3. NEW LOGIC: Plan mein added har item ki city check karo
+  planItems.forEach(item => {
+    let rawLocation = "";
+
+    if (item.type === 'flight') {
+      rawLocation = item.cityName || item.to || item.toAirport;
+    } else if (item.type === 'hotel' || item.type === 'attraction') {
+      rawLocation = item.cityName || item.address;
+    } else if (item.type === 'transfer') {
+      rawLocation = item.to; // Drop location
+    } else if (item.type === 'other') {
+      rawLocation = item.destination || item.cityName;
+    }
+
+    const c = resolveCity(rawLocation);
+    if (c) cities.add(c);
+  });
 
   return Array.from(cities);
 }, [planItems, destNames, rfq.from]);
-  const journeyPath = journeyCities.join(' ➔ ');
+  const journeyPath = journeyCities
 
   // 3. Calculation for Date Range & Form-based Days
   const tripDateRange = startDate && endDate ? `${fmtDate(startDate)} - ${fmtDate(endDate)}` : "";
@@ -1347,7 +1583,7 @@ const journeyCities = useMemo(() => {
     { id:'flights',     label:'Flights'     },
     { id:'hotels',      label:'Hotels'      },
     { id:'attractions', label:'Attractions' },
-    { id:'transport',   label:'Transport'   },
+    { id:'transfer',   label:'Transfer'   },
     { id:'other',       label:'Other'       },
   ];
 
@@ -1355,13 +1591,21 @@ const journeyCities = useMemo(() => {
     const id = item.id || (item.type + '_' + Date.now());
     setPlanItems(prev => {
       if (prev.find(p => p.id === id)) return prev;
-      const next = [...prev, { ...item, id, status:'pending' }];
+      const next = [...prev, { ...item, id, status: item.status || 'pending' }];
       saveItems(next);
       return next;
     });
     setShowBudgetToast(true);
   };
-
+const reorderPlan = (fromIdx, toIdx) => {
+  setPlanItems(prev => {
+    const next = [...prev];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    saveItems(next);
+    return next;
+  });
+};
   const removeFromPlan = (id) => setPlanItems(prev => {
     const next = prev.filter(p => p.id !== id);
     saveItems(next);
@@ -1393,8 +1637,9 @@ const journeyCities = useMemo(() => {
 
   const flightTotal    = planItems.filter(p => p.type === 'flight'    && p.status !== 'cancelled').reduce((s, f) => s + (parseFloat(f.price) || 0), 0);
   const hotelTotal     = planItems.filter(p => p.type === 'hotel'     && p.status !== 'cancelled').reduce((s, h) => s + (parseFloat(h.price || 0) * (Number(h.nights) || 1)), 0);
-  const transportTotal = planItems.filter(p => p.type === 'transport' && p.status !== 'cancelled').reduce((s, t) => s + (parseFloat(t.price?.replace(/[^\d]/g, '') || 0) || 0), 0);
-  const grandTotal     = flightTotal + hotelTotal + transportTotal;
+ const transportTotal = planItems.filter(p => p.type === 'transfer' && p.status !== 'cancelled').reduce((s, t) => s + (parseFloat(t.price?.replace(/[^\d]/g, '') || 0) || 0), 0);
+const otherTotal     = planItems.filter(p => p.type === 'other'     && p.status !== 'cancelled').reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
+const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
 
   const activeBudget = rfq.budget || rfq.tripBudget || profile.budget || 0;
 
@@ -1452,15 +1697,30 @@ const journeyCities = useMemo(() => {
               {/* ID Badge + Visual Journey Route (Arrows ➔) */}
               <div className="flex items-center gap-2">
                 {rfq._id && (
-                  <span className="text-[9px] font-extrabold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-widest">
-                    ID: {rfq._id.replace(': ', '').replace(':', '')}
-                  </span>
+               <span className="text-[9px] font-extrabold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-widest">
+  TRIP-ID: {rfq._id.replace(': ', '').replace(':', '')}
+</span>
                 )}
                 <span className="text-gray-300 text-xs">|</span>
                 <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                      {journeyPath}
-                   </span>
+              <span style={{ display:'flex', alignItems:'center', gap:'4px', flexWrap:'nowrap' }}>
+ {journeyCities.map((city, i) => (
+  <span key={i} style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+    {i === 0 && (
+      <svg width="10" height="12" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#E53E3E"/>
+        <circle cx="12" cy="9" r="3" fill="#9B2C2C"/>
+      </svg>
+    )}
+    <span style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+      {city}
+    </span>
+    {i < journeyCities.length - 1 && (
+      <span style={{ color:'#d1d5db', fontSize:'10px', margin:'0 2px' }}>•</span>
+    )}
+  </span>
+))}
+</span>
                 </div>
               </div>
             </div>
@@ -1503,8 +1763,13 @@ const journeyCities = useMemo(() => {
       {/* ══════════════════════════════════════════════
           Three-Panel Resizable Layout
       ══════════════════════════════════════════════ */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'row' }}>
+      
 
+<div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'row', position: 'relative' }}>
+
+ 
+  {/* ── Panel 1: AI Chat ── */}
+  ...
         {/* ── Panel 1: AI Chat (collapsible via Genie button) ── */}
         <div
           style={{
@@ -1514,36 +1779,16 @@ const journeyCities = useMemo(() => {
             transition: chatOpen ? 'none' : 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: chatOpen ? 'none' : '0',
+          borderRight: 'none',
             position: 'relative',
           }}
         >
           {chatOpen && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-              {/* Hide button injected into the panel header area */}
-              <div style={{
-                position: 'absolute', top: '8px', right: '8px', zIndex: 50,
-              }}>
-                <button
-                  onClick={() => setChatOpen(false)}
-                  title="Hide AI Chat"
-                  style={{
-                    width: '26px', height: '26px',
-                    borderRadius: '50%',
-                    background: 'rgba(247,190,57,0.15)',
-                    border: '1px solid rgba(247,190,57,0.4)',
-                    cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '10px', color: '#92400e', fontWeight: 800,
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(247,190,57,0.35)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(247,190,57,0.15)'; }}
-                >
-                  ‹
-                </button>
-              </div>
-              <AIChat rfq={rfq} onRfqUpdate={handleRfqUpdate} onTabSwitch={tab => setActiveFilter(tab)} />
+           {/* Mini Genie — right edge border pe */}
+
+              <AIChat rfq={rfq} onRfqUpdate={handleRfqUpdate} onTabSwitch={tab => setActiveFilter(tab)}
+               onClose={() => setChatOpen(false)} />
             </div>
           )}
         </div>
@@ -1575,6 +1820,8 @@ const journeyCities = useMemo(() => {
               setShowBookView={setShowBookView}
               setActiveFilter={setActiveFilter}
               startDate={startDate} 
+              addToPlan={addToPlan}
+              reorderPlan={reorderPlan} 
             />
           )}
         </div>

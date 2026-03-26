@@ -64,6 +64,11 @@ export default function TransportCard({ option, inPlan = false, onAdd }) {
 
   return (
     <div
+      draggable="true"
+  onDragStart={(e) => {
+    e.dataTransfer.setData("itemData", JSON.stringify({ ...option, type: 'transfer' }));
+    e.dataTransfer.effectAllowed = "copy";
+  }}
       className={`relative bg-white border rounded-2xl transition-all ${
         isSelecting
           ? 'p-0'                // overlay apna padding lega
@@ -73,7 +78,7 @@ export default function TransportCard({ option, inPlan = false, onAdd }) {
           ? 'border-gold-300 bg-gold-50/30'
           : 'border-gray-200 hover:border-gray-300'
       }`}
-      style={isSelecting ? { minHeight: '320px' } : {}}
+      style={isSelecting ? { minHeight: '420px' } : {}}
     >
       {/* ───────── Booking Overlay ───────── */}
       {isSelecting && (

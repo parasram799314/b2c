@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import TripLoader from './TripLoader';
 
 const CITIES = [
   'Indore, India','Mumbai, India','Delhi, India','Bangalore, India',
@@ -397,7 +398,7 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
               {[1,2,3,4,5].map(r => (
                 <button key={r} onClick={() => toggleRating(r)}
                   style={{ display:'flex', alignItems:'center', gap:'4px', padding:'7px 16px', borderRadius:'8px', border:`1.5px solid ${ratings.includes(r)?'#F5A623':'#e4e6f0'}`, background: ratings.includes(r)?'#FFF3DC':'#fff', cursor:'pointer', fontSize:'13px', fontWeight:700, color: ratings.includes(r)?'#D97706':'#6b7280', transition:'all 0.15s' }}>
-                  {'★'.repeat(r)} <span style={{fontSize:'12px'}}>{r} Star</span>
+                   <span style={{fontSize:'12px'}}>{r} Star</span>
                 </button>
               ))}
             </div>
@@ -411,6 +412,7 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
 // ─── MAIN ─────────────────────────────────────────────────────
 export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan, onOpenDetail }) {
   const [expanded,   setExpanded]   = useState(false);
+  const [showLoader, setShowLoader] = useState(false);  
   const formRef = useRef();
 
   useEffect(()=>{
@@ -516,10 +518,13 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
       travelClass:tClass, travelType, budget, reviewer:tripReviewer, note,
       returnToBase, aiGenerate:aiMode, createdAt:new Date().toISOString(), status:'draft',
     };
-    onSubmit?.(rfq);
-    doCollapse();
+      setShowLoader(true);
+        doCollapse();   
+        onSubmit?.(rfq);     // ← ADD
+    
   };
   // ── COLLAPSED ──
+  
   if(!expanded){
     return (
       <div style={{width:'100%'}}>
@@ -548,6 +553,10 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
           </div>
         </div>
         {showPrivacy&&<PrivacyModal onClose={()=>setShowPrivacy(false)}/>}
+            <TripLoader                                        
+        isVisible={showLoader}
+        destinations={destinations.map(d => ({ destination: d.city }))}
+      />
       </div>
     );
   }
@@ -571,8 +580,7 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
                 <h2 style={{fontSize:'24px',fontWeight:900,letterSpacing:'-0.02em',color:'#111827',fontFamily:'Georgia,serif',margin:0}}>Book a trip</h2>
-                <span style={{fontSize:'11px',fontWeight:700,background:'#FFF3DC',color:'#D97706',borderRadius:'8px',padding:'4px 10px',letterSpacing:'0.05em',border:'1px solid #FDE68A'}}>{rfqId}</span>
-              </div>
+               </div>
               <button onClick={doCollapse} style={{width:'34px',height:'34px',borderRadius:'50%',border:'1.5px solid #e5e7eb',background:'#fff',cursor:'pointer',fontSize:'14px',color:'#9ca3af',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
             </div>
 
@@ -598,17 +606,7 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                 </button>
               ))}
               {/* Traveler pill pushed to right */}
-              <div style={{marginLeft:'auto',display:'flex',alignItems:'center',paddingRight:'4px'}}>
-                <button onClick={()=>setShowPax(true)}
-                  style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',border:'1.5px solid #e5e7eb',borderRadius:'999px',padding:'6px 14px',cursor:'pointer',background:'#fff',color:'#374151',transition:'border-color 0.15s'}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor='#F5A623'}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor='#e5e7eb'}>
-                  <IcoUser size={13}/>
-                  <span style={{fontWeight:700}}>{totalPax} Traveler{totalPax>1?'s':''}</span>
-                  <span style={{fontSize:'11px',color:'#9ca3af'}}>{tClass}</span>
-                  <span style={{color:'#9ca3af',fontSize:'10px'}}>▾</span>
-                </button>
-              </div>
+           
             </div>
 
             {/* White content card */}
@@ -619,24 +617,32 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                 <div>
                   {/* NEW: Trip Name and Status Row */}
   <div style={{ display:'flex', gap:'14px', marginBottom:'20px' }}>
-    <div style={{ flex: 1 }}>
-      <label style={S.label}>Trip Name:</label>
-      <div style={S.inputBox}>
-        <input 
-          value={tripName} 
-          onChange={e => setTripName(e.target.value)} 
-          placeholder="Enter trip name (e.g. Summer Vacation)" 
-          style={S.inputText} 
-        />
-      </div>
+  <div style={{ flex: 1 }}>
+    <label style={S.label}>Trip Name:</label>
+    <div style={S.inputBox}>
+      <input 
+        value={tripName} 
+        onChange={e => setTripName(e.target.value)} 
+        placeholder="Enter trip name (e.g. Summer Vacation)" 
+        style={S.inputText} 
+      />
     </div>
-    <div style={{ width: '150px' }}>
-      <label style={S.label}>Status:</label>
-      <div style={{ ...S.inputBox, background: '#f3f4f6', cursor: 'not-allowed' }}>
-        <input value="Draft" disabled style={{ ...S.inputText, color: '#9ca3af' }} />
+  </div>
+  <div style={{ width:'280px', flexShrink:0 }}>
+    <label style={S.label}>Status:</label>
+    <div style={{ ...S.inputBox, border:'1.5px solid #e5e7eb', borderRadius:'10px', background:'#fff', justifyContent:'space-between' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+        <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0 }}/>
+        <span style={{ fontSize:'14px', fontWeight:700, color:'#374151' }}>DRAFT</span>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+        <span style={{ fontSize:'12px', color:'#9ca3af', fontWeight:500 }}>Trip ID:</span>
+        <span style={{ fontSize:'12px', fontWeight:700, color:'#D97706' }}>{rfqId.replace(': ','')}</span>
+        <span style={{ color:'#9ca3af', fontSize:'10px' }}>▾</span>
       </div>
     </div>
   </div>
+</div>
                   {/* From row */}
                   <div style={{ display:'flex', alignItems:'flex-end', gap:'14px', marginBottom:'24px', flexWrap:'wrap' }}>
                     <div style={{ minWidth:'200px', flex:1 }}>
@@ -677,6 +683,7 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                         style={{ accentColor:'#F5A623', width:'15px', height:'15px', cursor:'pointer' }}/>
                       Return to base
                     </label>
+                    
                   </div>
                 </div>
               )}
@@ -689,25 +696,53 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
               {/* ── TRIP PLANNER ── */}
               {activeTab==='Trip Planner' && (
                 <div>
-                   <div style={{ display:'flex', gap:'14px', marginBottom:'20px' }}>
-    <div style={{ flex: 1 }}>
-      <label style={S.label}>Trip Name:</label>
-      <div style={S.inputBox}>
-        <input 
-          value={tripName} 
-          onChange={e => setTripName(e.target.value)} 
-          placeholder="Enter trip name (e.g. Summer Vacation)" 
-          style={S.inputText} 
-        />
-      </div>
-    </div>
-    <div style={{ width: '150px' }}>
-      <label style={S.label}>Status:</label>
-      <div style={{ ...S.inputBox, background: '#f3f4f6', cursor: 'not-allowed' }}>
-        <input value="Draft" disabled style={{ ...S.inputText, color: '#9ca3af' }} />
-      </div>
+{/* Trip Name, Status aur Trip ID - Customized Design */}
+<div style={{ display:'flex', gap:'14px', marginBottom:'20px', alignItems: 'flex-end' }}>
+  
+  {/* 1. Trip Name (Input Field) */}
+  <div style={{ flex: 1 }}>
+    <label style={S.label}>Trip Name:</label>
+    <div style={S.inputBox}>
+      <input 
+        value={tripName} 
+        onChange={e => setTripName(e.target.value)} 
+        placeholder="Enter trip name (e.g. Summer Vacation)" 
+        style={S.inputText} 
+      />
     </div>
   </div>
+
+  {/* 2. Status Box (Non-changeable, Traveler button style) */}
+  <div style={{ width:'130px', flexShrink:0 }}>
+    <label style={S.label}>Status:</label>
+    <div style={{ 
+      ...S.inputBox, 
+      background:'#fff', 
+      border:'1.5px solid #e5e7eb', 
+      cursor:'default', 
+      userSelect:'none' 
+    }}>
+      <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0, marginRight:'8px' }}/>
+      <span style={{ fontSize:'14px', fontWeight:700, color:'#374151' }}>DRAFT</span>
+    </div>
+  </div>
+
+  {/* 3. Trip ID Box (No Heading, Text Inside Box, Non-changeable) */}
+  <div style={{ width:'180px', flexShrink:0 }}>
+    {/* Iske upar label nahi hai as per requirement */}
+    <div style={{ 
+      ...S.inputBox, 
+      background:'#fff', 
+      border:'1.5px solid #e5e7eb', 
+      cursor:'default', 
+      userSelect:'none',
+      justifyContent: 'center'
+    }}>
+      <span style={{ fontSize:'12px', color:'#9ca3af', fontWeight:600, marginRight:'6px' }}>Trip ID:</span>
+      <span style={{ fontSize:'14px', fontWeight:700, color:'#D97706' }}>{rfqId.replace(': ','')}</span>
+    </div>
+  </div>
+</div>
                   {/* From + Departure row */}
                   <div style={{ display:'flex', alignItems:'flex-end', gap:'14px', marginBottom:'24px', flexWrap:'wrap' }}>
                     <div style={{ minWidth:'200px', flex:1 }}>
@@ -743,11 +778,58 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                       onMouseLeave={e=>e.currentTarget.style.background='#F5A623'}>
                       <IcoPlus size={13}/> Add Destination
                     </button>
-                    <label style={{ display:'flex', alignItems:'center', gap:'7px', cursor:'pointer', fontSize:'13px', fontWeight:600, color:'#374151', marginLeft:'8px' }}>
-                      <input type="checkbox" checked={returnToBase} onChange={e=>setReturnToBase(e.target.checked)}
-                        style={{ accentColor:'#F5A623', width:'15px', height:'15px', cursor:'pointer' }}/>
-                      Return to base
-                    </label>
+                   <label style={{ display:'flex', alignItems:'center', gap:'7px', cursor:'pointer', fontSize:'13px', fontWeight:600, color:'#374151', marginLeft:'8px' }}>
+  <input type="checkbox" checked={returnToBase} onChange={e=>setReturnToBase(e.target.checked)}
+    style={{ accentColor:'#F5A623', width:'15px', height:'15px', cursor:'pointer' }}/>
+  Return to base
+  <div style={{ position:'relative', display:'inline-flex', alignItems:'center' }}
+    onMouseEnter={e => {
+      const tip = e.currentTarget.querySelector('.tip');
+      if (tip) tip.style.display = 'block';
+    }}
+    onMouseLeave={e => {
+      const tip = e.currentTarget.querySelector('.tip');
+      if (tip) tip.style.display = 'none';
+    }}
+  >
+    <span style={{
+      width:'15px', height:'15px', borderRadius:'50%',
+      background:'#e5e7eb', color:'#6b7280',
+      fontSize:'9px', fontWeight:900,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      cursor:'help', userSelect:'none',
+    }}>i</span>
+    <div className="tip" style={{
+      display:'none',
+      position:'absolute', bottom:'22px', left:'50%',
+      transform:'translateX(-50%)',
+      background:'#1f2937', color:'#fff',
+      fontSize:'11px', fontWeight:600,
+      padding:'5px 10px', borderRadius:'7px',
+      whiteSpace:'nowrap', zIndex:9999,
+      boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
+      pointerEvents:'none',
+    }}>
+      Return flight to starting destination
+      <div style={{
+        position:'absolute', top:'100%', left:'50%',
+        transform:'translateX(-50%)',
+        borderLeft:'5px solid transparent',
+        borderRight:'5px solid transparent',
+        borderTop:'5px solid #1f2937',
+      }}/>
+    </div>
+  </div>
+</label>
+                     <button onClick={()=>setShowPax(true)}
+    style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', border:'1.5px solid #e5e7eb', borderRadius:'999px', padding:'7px 16px', cursor:'pointer', background:'#fff', color:'#374151', transition:'border-color 0.15s', marginLeft:'12px' }}
+    onMouseEnter={e=>e.currentTarget.style.borderColor='#F5A623'}
+    onMouseLeave={e=>e.currentTarget.style.borderColor='#e5e7eb'}>
+    <IcoUser size={13}/>
+    <span style={{fontWeight:700}}>{totalPax} Traveler{totalPax>1?'s':''}</span>
+    <span style={{fontSize:'11px',color:'#9ca3af'}}>{tClass}</span>
+    <span style={{color:'#9ca3af',fontSize:'10px'}}>▾</span>
+  </button>
                   </div>
                 </div>
               )}
@@ -807,7 +889,7 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                         color: isSelected ? '#D97706' : '#6b7280', transition: 'all 0.15s'
                       }}
                     >
-                      {'★'.repeat(star)} <span style={{ fontSize: '11px' }}>{star} Star</span>
+                     <span style={{ fontSize: '11px' }}>{star} Star</span>
                     </button>
                   );
                 })}
@@ -918,6 +1000,10 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
       {showPrivacy&&<PrivacyModal onClose={()=>setShowPrivacy(false)}/>}
       {showAddTrav&&<AddTravelerModal onClose={()=>setShowAddTrav(false)} onAdd={t=>setTravelers(p=>[...p,t])}/>}
       {showPax&&<PassengersModal adults={adults} children={children} infants={infants} travelClass={tClass} onUpdate={(a,c,i,tc)=>{setAdults(a);setChildren(c);setInfants(i);setTClass(tc);}} onClose={()=>setShowPax(false)}/>}
+     <TripLoader                                                  
+        isVisible={showLoader}                                      
+        destinations={destinations.map(d => ({ destination: d.city }))} 
+      />  
     </>
   );
 }

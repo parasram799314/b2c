@@ -49,8 +49,8 @@ export default function ShareModal({ isOpen, onClose, planItems, rfq, grandTotal
     });
     
     Object.entries(typeCount).forEach(([type, count]) => {
-      const emoji = { flight: '✈️', hotel: '🏨', transport: '🚗', attraction: '🗺️', other: '📋' }[type] || '📋';
-      const label = { flight: 'Flights', hotel: 'Hotels', transport: 'Transport', attraction: 'Attractions', other: 'Other' }[type] || type;
+      const emoji = { flight: '✈️', hotel: '🏨', transfer: '🚗', attraction: '🗺️', other: '📋' }[type] || '📋';
+      const label = { flight: 'Flights', hotel: 'Hotels', transfer: 'Transfer', attraction: 'Attractions', other: 'Other' }[type] || type;
       text += `${emoji} ${label}: ${count}\n`;
     });
     

@@ -14,14 +14,22 @@ export default function AttractionCard({ attraction, inPlan, onAdd }) {
     : null;
 
   const handleAdd = () => {
-    onAdd({ ...attraction, entryFee: `₹${amount}` });
-    setIsSelecting(false);
-  };
+  onAdd({ ...attraction, type: 'attraction', entryFee: `₹${amount}` });
+  setIsSelecting(false);
+};
 
   return (
-    <div className={`bg-white border rounded-xl overflow-hidden transition-all ${
-      inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
-    }`} style={isSelecting ? { minHeight: '200px' } : {}}>
+ <div 
+  draggable="true"
+  onDragStart={(e) => {
+    e.dataTransfer.setData("itemData", JSON.stringify({ ...attraction, type: 'attraction' }));
+    e.dataTransfer.effectAllowed = "copy";
+  }}
+ 
+ 
+ className={`relative bg-white border rounded-xl overflow-hidden transition-all ${
+  inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
+}`} style={isSelecting ? { minHeight: '200px' } : {}}>
 
       {/* Amount Selection Overlay */}
       {isSelecting && (

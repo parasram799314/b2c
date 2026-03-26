@@ -20,7 +20,7 @@ export function parseDays(itinerary = '') {
       currentLines = [];
     } else if (currentDay) {
       // Skip meta lines
-      if (!line.match(/^##\s*(Travel Type|Recommended Transport|Practical Tips)/i)) {
+      if (!line.match(/^##\s*(Travel Type|Recommended Transfer|Practical Tips)/i)) {
         currentLines.push(line);
       }
     }
@@ -50,5 +50,5 @@ export function extractTravelType(itinerary = '') {
 }
 
 export function extractTransportMode(itinerary = '') {
-  return itinerary.match(/##\s*Recommended Transport:\s*(.+)/i)?.[1]?.trim() || 'Flight';
+  return itinerary.match(/##\s*Recommended Transfer:\s*(.+)/i)?.[1]?.trim() || 'Flight';
 }

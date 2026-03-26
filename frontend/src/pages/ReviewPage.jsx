@@ -40,7 +40,7 @@ export default function ReviewPage({ items = [], mode = 'selected', onBack }) {
   ));
 
   const grouped = useMemo(() => {
-    const g = { flight: [], hotel: [], attraction: [], restaurant: [], transport: [], other: [] };
+    const g = { flight: [], hotel: [], attraction: [], restaurant: [], transfer: [], other: [] };
     (items || []).forEach((it) => {
       const t = it.type || 'other';
       if (!g[t]) g[t] = [];
@@ -101,7 +101,7 @@ export default function ReviewPage({ items = [], mode = 'selected', onBack }) {
           ['hotel', 'Hotels'],
           ['attraction', 'Activities'],
           ['restaurant', 'Restaurants'],
-          ['transport', 'Transport'],
+          ['transfer', 'Transfer'],
         ].map(([type, label]) => {
           const list = grouped[type] || [];
           if (!list.length) return null;

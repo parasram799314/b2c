@@ -105,7 +105,20 @@ function FlightCard({ flight, inPlan, onAdd }) {
 
   return (
     <>
-      <div style={{ background:'#fff', border:`1px solid ${inPlan?'#F7BE39':'#e5e7eb'}`, borderRadius:'12px', overflow:'hidden', marginBottom:'10px', boxShadow: inPlan?'0 0 0 2px rgba(247,190,57,0.2)':'0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div 
+       draggable="true"
+  onDragStart={(e) => {
+    const dragData = {
+      ...flight,
+      type: 'flight',
+      id: 'flight_' + (flight.id || flight.flightNumber || Date.now()),
+      depTime: flight.departureTime ?? flight.depTime,
+      arrTime: flight.arrivalTime ?? flight.arrTime,
+    };
+    e.dataTransfer.setData("itemData", JSON.stringify(dragData));
+    e.dataTransfer.effectAllowed = "copy";
+  }}
+      style={{ background:'#fff', border:`1px solid ${inPlan?'#F7BE39':'#e5e7eb'}`, borderRadius:'12px', overflow:'hidden', marginBottom:'10px', boxShadow: inPlan?'0 0 0 2px rgba(247,190,57,0.2)':'0 1px 3px rgba(0,0,0,0.06)' }}>
 
         {/* Logo + route */}
         <div style={{ padding:'12px 14px 6px', display:'flex', alignItems:'center', gap:'10px' }}>
@@ -332,16 +345,32 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
   },[rawFlights]);
 
   const planIds = planItems.map(p=>p.id);
-  const handleAdd = (flight)=>{
-    const id='flight_'+(flight.id||flight.flightNumber||Date.now());
-    onAddToPlan({...flight,type:'flight',id,depTime:flight.departureTime??flight.depTime,arrTime:flight.arrivalTime??flight.arrTime,depDate:selectedDate});
-  };
+  // components/FlightsTab.jsx mein handleAdd function ko update karein
 
+const handleAdd = (flight) => {
+  const id = 'flight_' + (flight.id || flight.flightNumber || Date.now());
+  
+  // --- YE LOGIC ADD KAREIN: USD ko INR mein convert karke save karo ---
+  const rawPrice = Number(flight.price);
+  const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
+
+  onAddToPlan({
+    ...flight,
+    type: 'flight',
+    id,
+    price: inrPrice, // Ab yahan 19000+ wala number save hoga
+    depTime: flight.departureTime ?? flight.depTime,
+    arrTime: flight.arrivalTime ?? flight.arrTime,
+    depDate: selectedDate
+  });
+};
   const inputBox = { display:'flex',alignItems:'center',gap:'8px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'8px',padding:'8px 10px' };
   const lbl = { fontSize:'10px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'4px' };
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflowY:'auto',background:'#f3f4f6'}}>
+    <div
+    
+     style={{display:'flex',flexDirection:'column',height:'100%',overflowY:'auto',background:'#f3f4f6'}}>
 
       {/* Destination indicator */}
       {selectedDest && (
@@ -395,15 +424,28 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
       </div>
 
       {/* 2. FILTER TOGGLE */}
+     {/* 2. FILTER TOGGLE */}
       <div style={{flexShrink:0,background:'#fff',borderBottom:'1px solid #e5e7eb'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',cursor:'pointer'}} onClick={()=>setShowFilters(v=>!v)}>
-          <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-            <span style={{fontSize:'13px',fontWeight:700,color:'#111827'}}>Sort &amp; Filter</span>
-            <span style={{fontSize:'11px',color:'#9ca3af'}}>({filtered.length} flights)</span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-            <button onClick={e=>{e.stopPropagation();setFilters(mkDefaults(maxPriceLimit));}} style={{fontSize:'11px',color:'#F7BE39',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>Reset All</button>
+          
+          {/* LEFT SIDE: Arrow Icon + Heading + Reset Button */}
+          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+            {/* Arrow Icon yahan move kar diya */}
             <span style={{fontSize:'11px',color:'#9ca3af'}}>{showFilters?'▲':'▼'}</span>
+            
+            <span style={{fontSize:'13px',fontWeight:700,color:'#111827'}}>Sort &amp; Filter</span>
+            
+            <button 
+              onClick={e=>{e.stopPropagation();setFilters(mkDefaults(maxPriceLimit));}} 
+              style={{fontSize:'11px',color:'#F7BE39',background:'none',border:'none',cursor:'pointer',fontWeight:700}}
+            >
+              Reset All
+            </button>
+          </div>
+
+          {/* RIGHT SIDE: Only Flight Count */}
+          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+            <span style={{fontSize:'11px',color:'#9ca3af'}}>({filtered.length} flights)</span>
           </div>
         </div>
 
