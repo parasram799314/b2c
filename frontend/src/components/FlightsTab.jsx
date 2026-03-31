@@ -107,17 +107,23 @@ function FlightCard({ flight, inPlan, onAdd }) {
     <>
       <div 
        draggable="true"
-  onDragStart={(e) => {
-    const dragData = {
-      ...flight,
-      type: 'flight',
-      id: 'flight_' + (flight.id || flight.flightNumber || Date.now()),
-      depTime: flight.departureTime ?? flight.depTime,
-      arrTime: flight.arrivalTime ?? flight.arrTime,
-    };
-    e.dataTransfer.setData("itemData", JSON.stringify(dragData));
-    e.dataTransfer.effectAllowed = "copy";
-  }}
+  // FlightCard component mein onDragStart fix:
+onDragStart={(e) => {
+  const rawPrice = Number(flight.price);
+  const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
+  
+  const dragData = {
+    ...flight,
+    type: 'flight',
+    id: 'flight_' + (flight.id || flight.flightNumber || Date.now()),
+    price: inrPrice,  // ✅ INR price
+    depTime: flight.departureTime ?? flight.depTime,
+    arrTime: flight.arrivalTime ?? flight.arrTime,
+    depDate: flight.depDate || '',
+  };
+  e.dataTransfer.setData("itemData", JSON.stringify(dragData));
+  e.dataTransfer.effectAllowed = "copy";
+}}
       style={{ background:'#fff', border:`1px solid ${inPlan?'#F7BE39':'#e5e7eb'}`, borderRadius:'12px', overflow:'hidden', marginBottom:'10px', boxShadow: inPlan?'0 0 0 2px rgba(247,190,57,0.2)':'0 1px 3px rgba(0,0,0,0.06)' }}>
 
         {/* Logo + route */}

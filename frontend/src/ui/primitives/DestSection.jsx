@@ -1,5 +1,7 @@
 // ui/primitives/DestSection.jsx
 // Wrapper used in tabs to group content per destination
+import React, { useState } from "react";
+import axios from "axios";
 export default function DestSection({ name, nights, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -28,6 +30,3 @@ export default function DestSection({ name, nights, children, defaultOpen = true
     </div>
   );
 }
-
-// Missing import fix
-import { useState } from 'react';

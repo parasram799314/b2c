@@ -48,7 +48,7 @@ Total trip duration: ${totalNights + 1} days, ${totalNights} nights
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
 ## Travel Type: [leisure/family/adventure/honeymoon/business/cultural]
-## Recommended Transport: [flight/train/car — mention 9AM reachability from ${guestCountry || 'India'}]
+## Recommended Transfer: [flight/train/car — mention 9AM reachability from ${guestCountry || 'India'}]
 
 ## Day 1 · Journey from ${guestCountry || 'India'} to ${mainDest}
 [Travel day details — flight timing, airport, arrival, check-in, evening plan]
@@ -74,7 +74,7 @@ Evening:
 ## Practical Tips:
 - Visa: [requirement for ${guestCountry || 'India'} passport holders visiting ${mainDest}]
 - Best time to visit: [season/month recommendation]
-- Local transport: [metro/cab/bus tips for getting around]
+- Local transfer: [metro/cab/bus tips for getting around]
 - Currency: [local currency, exchange tips, ATM availability]  
 - Language: [local language, useful phrases]
 - Emergency numbers: [local police, ambulance, tourist helpline]
@@ -93,7 +93,7 @@ Make each day VERY detailed with real place names, actual opening hours where kn
 
   const content      = completion.choices[0]?.message?.content || '';
   const travelType   = content.match(/## Travel Type:\s*(.+)/i)?.[1]?.trim()        || 'General';
-  const modeOfTransport = content.match(/## Recommended Transport:\s*(.+)/i)?.[1]?.trim() || 'Flight';
+  const modeOfTransport = content.match(/## Recommended Transfer:\s*(.+)/i)?.[1]?.trim() || 'Flight';
 
   return { itinerary: content, travelType, modeOfTransport };
 }
@@ -113,7 +113,7 @@ INSTRUCTIONS:
 - If the user asks about flights, hotels, restaurants, or attractions → recommend options and say they can tap Add to add to their plan
 - If the user asks about visa/documents → mention the Checklist tab
 - If the user asks about weather/packing → mention the Weather tab
-- If the user asks about transport/cab → mention the Transport tab
+- If the user asks about transfer/cab → mention the Transfer tab
 - If suggesting specific places, use real names
 - Be conversational and friendly
 - If you don't know something specific, say so honestly`;

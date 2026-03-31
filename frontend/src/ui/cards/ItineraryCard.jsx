@@ -1,4 +1,5 @@
 // ui/cards/ItineraryCard.jsx
+import { Icons } from '../icons';
 
 const DEST_IMAGES = {
   london:    'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&q=80',
@@ -24,27 +25,17 @@ function getImg(rfq) {
 
 function getTitle(rfq) {
   const dest   = rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || 'Trip';
-  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || 0), 0) || 1;
-  
-  // Handle both RFQ- and trip_ formats
-  let displayId = '';
-  if (rfq._id) {
-    if (rfq._id.startsWith('RFQ-')) {
-      displayId = rfq._id;
-    } else if (rfq._id.startsWith('trip_')) {
-      // Convert trip_ to RFQ format for display
-      const timestamp = rfq._id.replace('trip_', '');
-      displayId = 'RFQ-' + timestamp.toString(36).toUpperCase().slice(-6);
-    } else {
-      displayId = rfq._id;
-    }
-  }
-  
+  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 1;
+
+  // ✅ rfqId directly from MongoDB field (e.g. "A24CIM")
+  // MongoDB ka ObjectId _id kabhi display nahi karte
+  const displayId = rfq.rfqId || '';
+
   return `${displayId ? `${displayId} · ` : ''}${dest} ${nights + 1}-Day Tour`;
 }
 
 function getMeta(rfq) {
-  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || 0), 0) || 1;
+  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 1;
   const cities = rfq.destinations?.length || 1;
   const date   = new Date(rfq.createdAt).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -63,21 +54,12 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
     ? Math.round((stats.completed / stats.total) * 100)
     : 0;
 
-  // Read plan status from localStorage
-  let planStatus = null;
-  try {
-    const saved = JSON.parse(localStorage.getItem('plan_' + rfq._id) || '[]');
-    if (saved.length) {
-      const hasPaid      = saved.some(p => p.status === 'paid');
-      const hasPending   = saved.some(p => p.status === 'pending');
-      const hasCancelled = saved.some(p => p.status === 'cancelled');
-      
-      // Priority: cancelled > pending > paid
-      if (hasCancelled)                         planStatus = 'cancelled';
-      else if (hasPending)                      planStatus = 'pending';
-      else if (hasPaid)                         planStatus = 'paid';
-    }
-  } catch {}
+  const planStatus = rfq.reviewStatus === 'approved'  ? 'approved'
+    : rfq.reviewStatus === 'sent'      ? 'pending'
+    : rfq.reviewStatus === 'paid'      ? 'paid'
+    : rfq.reviewStatus === 'cancelled' ? 'cancelled'
+    : rfq.reviewStatus === 'rejected'  ? 'rejected'
+    : null;
 
   return (
     <div
@@ -99,14 +81,14 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
           </div>
         )}
 
-        {/* Plan status badge */}
+        {/* Plan status badge — MongoDB reviewStatus se */}
         {planStatus && (
           <div className="absolute top-2 right-9" style={{
             fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-            background: planStatus === 'paid' ? '#dcfce7' : planStatus === 'cancelled' ? '#fee2e2' : '#fef3c7',
-            color:      planStatus === 'paid' ? '#16a34a' : planStatus === 'cancelled' ? '#dc2626' : '#92400e',
+            background: planStatus === 'approved' ? '#dcfce7' : planStatus === 'paid' ? '#dcfce7' : planStatus === 'cancelled' ? '#fee2e2' : planStatus === 'rejected' ? '#fee2e2' : '#fef3c7',
+            color:      planStatus === 'approved' ? '#166534' : planStatus === 'paid' ? '#16a34a' : planStatus === 'cancelled' ? '#dc2626' : planStatus === 'rejected' ? '#991b1b' : '#92400e',
           }}>
-            {planStatus === 'paid' ? '✓ Paid' : planStatus === 'cancelled' ? 'Cancelled' : 'Pending'}
+            {planStatus === 'approved' ? '✓ Approved' : planStatus === 'paid' ? '✓ Paid' : planStatus === 'cancelled' ? 'Cancelled' : planStatus === 'rejected' ? 'Rejected' : 'Pending'}
           </div>
         )}
 
@@ -114,13 +96,13 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
           onClick={e => { e.stopPropagation(); onDelete?.(rfq._id); }}
           className="absolute top-2 right-2 w-6 h-6 bg-black/40 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-xs transition-colors opacity-0 group-hover:opacity-100"
         >
-          ✕
+          <Icons.Trash size={14} />
         </button>
 
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <div className="text-white font-bold text-sm leading-tight truncate">{title}</div>
           <div className="text-white/70 text-xs mt-0.5">
-            {rfq.guestCountry || 'India'} → {rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || dest}
+            {rfq.guestCountry || rfq.from || 'India'} → {rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || dest}
           </div>
         </div>
       </div>
@@ -128,19 +110,19 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
       <div className="p-3">
         <div className="flex items-center gap-3 mb-2">
           <div className="flex items-center gap-1 text-xs text-gray-500">
-            <span>📅</span>
+            <Icons.Calendar size={14} />
             <span className="font-semibold">{meta.days} days</span>
           </div>
           <div className="w-px h-3 bg-gray-200" />
           <div className="flex items-center gap-1 text-xs text-gray-500">
-            <span>🏙️</span>
+            <Icons.MapPin size={14} />
             <span className="font-semibold">
               {meta.cities} {meta.cities === 1 ? 'city' : 'cities'}
             </span>
           </div>
           <div className="w-px h-3 bg-gray-200" />
           <div className="flex items-center gap-1 text-xs text-gray-500">
-            <span>🏨</span>
+            <Icons.Hotel size={14} />
             <span className="font-semibold">
               {rfq.requireHotels ? 'Hotels' : 'No hotel'}
             </span>

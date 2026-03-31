@@ -3,76 +3,75 @@ import axios from 'axios';
 import HomePage from './pages/HomePage';
 import DetailPage from './pages/DetailPage';
 
-export default function App() {
+
+// ── Role Auth Imports ─────────────────────────────────────────
+import { AuthProvider, useAuth }   from './role-auth/role-auth/src/context/AuthContext';
+import { TripReviewProvider }      from './role-auth/role-auth/src/context/TripReviewContext';
+import LoginPage                   from './role-auth/role-auth/src/pages/LoginPage';
+import ManagerPage                 from './role-auth/role-auth/src/pages/ManagerPage';
+
+// ─────────────────────────────────────────────────────────────
+//  Main App Logic (original — kuch nahi badla)
+// ─────────────────────────────────────────────────────────────
+function UserApp() {
   const [page, setPage] = useState('home');
+  const { user } = useAuth(); 
   const [loading, setLoading] = useState(false);
   const [currentRfq, setCurrentRfq] = useState(null);
   const [itineraries, setItineraries] = useState([]);
   const [error, setError] = useState('');
 
-  // 1. Initial Load: Data fetch karna
+  // 1. Initial Load — MongoDB Atlas se itineraries fetch karo
   useEffect(() => {
     const loadData = async () => {
-      console.log('App.jsx - Initial load started');
       try {
         const r = await axios.get('/api/rfqs');
         if (r.data && r.data.data) {
-          console.log('App.jsx - API data loaded:', r.data.data);
           setItineraries(r.data.data);
-          localStorage.setItem('itineraries', JSON.stringify(r.data.data));
         }
       } catch (err) {
-        console.log('App.jsx - API failed, loading from localStorage');
-        // Agar API fail ho jaye toh LocalStorage se uthao
-        const saved = JSON.parse(localStorage.getItem('itineraries') || '[]');
-        console.log('App.jsx - localStorage data:', saved);
-        setItineraries(saved);
+        console.error('Failed to load itineraries:', err.message);
+        setError('Could not load itineraries. Is the backend running?');
       }
     };
     loadData();
   }, []);
 
-  // 2. Form Submit Handler
-  const handleSubmit = async (formData) => {
-    setLoading(true);
-    setError('');
+  // 2. Form Submit — Atlas mein save karo
+ // App.jsx — UserApp ke andar handleSubmit function
+const handleSubmit = async (formData) => {
+  setLoading(true);
+  setError('');
+  try {
+    const res = await axios.post('/api/rfqs', formData);
     
-    let finalRfq = null;
-
-    try {
-      const res = await axios.post('/api/rfqs', formData);
-      finalRfq = res.data.data;
-    } catch (err) {
-      // Fallback: API fail hone par local object banao
-      finalRfq = {
-        _id: 'trip_' + Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-        status: 'draft'
-      };
-    }
-
-    if (finalRfq) {
-      const updatedItineraries = [finalRfq, ...itineraries];
-      setItineraries(updatedItineraries);
-      localStorage.setItem('itineraries', JSON.stringify(updatedItineraries));
-      setCurrentRfq(finalRfq);
-      setPage('detail');
-    }
+    // ✅ FIX: formData + backend response merge karo
+    // formData mein tripName, budget hain
+    // res.data.data mein _id, itinerary etc hain
+    const newRfq = {
+      ...formData,       // tripName, budget pehle spread karo
+      ...res.data.data,  // backend se aaya data override karega (_id, itinerary etc)
+    };
     
-    setLoading(false);
-  };
+    setItineraries(prev => [newRfq, ...prev]);
+    setCurrentRfq(newRfq);
+    setPage('detail');
+  } catch (err) {
+    console.error('RFQ creation failed:', err.message);
+    setError('Failed to create itinerary. Please try again.');
+  }
+  setLoading(false);
+};
 
-  // 3. Delete Handler (LocalStorage ko bhi update karega)
+  // 3. Delete — Atlas se delete karo
   const handleDelete = async (id) => {
     try {
       await axios.delete(`/api/rfqs/${id}`);
-    } catch (e) {
-      console.log("Deleted locally");
+      setItineraries(prev => prev.filter(it => it._id !== id));
+    } catch (err) {
+      console.error('Delete failed:', err.message);
+      setItineraries(prev => prev.filter(it => it._id !== id));
     }
-    const filtered = itineraries.filter(it => it._id !== id);
-    setItineraries(filtered);
-    localStorage.setItem('itineraries', JSON.stringify(filtered));
   };
 
   if (page === 'detail' && currentRfq) {
@@ -80,11 +79,10 @@ export default function App() {
       <DetailPage
         rfq={currentRfq}
         onUpdate={(updated) => {
-            setCurrentRfq(updated);
-            // Optional: update in list too
-            const newList = itineraries.map(item => item._id === updated._id ? updated : item);
-            setItineraries(newList);
-            localStorage.setItem('itineraries', JSON.stringify(newList));
+          setCurrentRfq(updated);
+          setItineraries(prev =>
+            prev.map(item => item._id === updated._id ? updated : item)
+          );
         }}
         onBack={() => setPage('home')}
       />
@@ -102,6 +100,30 @@ export default function App() {
         setPage('detail');
       }}
       onDeleteItinerary={handleDelete}
+      currentUser={user}  // ✅ yeh add karo
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Role Router — login check + role ke hisaab se page dikhao
+// ─────────────────────────────────────────────────────────────
+function AppInner() {
+  const { user } = useAuth();
+
+  if (!user)                   return <LoginPage />;
+  return <UserApp />;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Root Export
+// ─────────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <TripReviewProvider>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </TripReviewProvider>
   );
 }

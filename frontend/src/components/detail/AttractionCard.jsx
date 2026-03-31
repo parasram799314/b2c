@@ -5,6 +5,9 @@ const FALLBACK = 'https://images.unsplash.com/photo-1488085061387-422e29b40080?w
 export default function AttractionCard({ attraction, inPlan, onAdd }) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [amount, setAmount] = useState(0);
+   const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+
 
   // ✅ FIX 1: Null guard — agar attraction undefined ho toh crash nahi hoga
   if (!attraction) return null;
@@ -14,7 +17,12 @@ export default function AttractionCard({ attraction, inPlan, onAdd }) {
     : null;
 
   const handleAdd = () => {
-  onAdd({ ...attraction, type: 'attraction', entryFee: `₹${amount}` });
+  onAdd({ ...attraction, type: 'attraction', entryFee: `₹${amount}` , price: Number(amount),     // amount ko 'price' naam se bhejein
+      date: date,          // Itinerary resolvedDate ke liye
+      startTime: time,     // Itinerary 🕒 display ke liye
+      id: `attraction_${attraction.attractionId || Date.now()}_${date}`
+  
+  });
   setIsSelecting(false);
 };
 
@@ -31,36 +39,40 @@ export default function AttractionCard({ attraction, inPlan, onAdd }) {
   inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
 }`} style={isSelecting ? { minHeight: '200px' } : {}}>
 
-      {/* Amount Selection Overlay */}
-      {isSelecting && (
-        <div className="absolute inset-0 z-20 flex flex-col p-3 bg-white rounded-xl">
-          <div className="text-[11px] font-bold text-gray-700 mb-1 uppercase tracking-wider">🎫 Entry Fee</div>
-          <div className="text-[10px] text-gray-400 mb-2 truncate">{attraction.name}</div>
-
-          <div className="space-y-2 flex-1">
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase tracking-wider">Amount (₹)</label>
-              <input type="number" min="0"
-                className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)} />
-            </div>
+    
+       {isSelecting && (
+      <div className="absolute inset-0 z-20 flex flex-col p-3 bg-white rounded-xl overflow-y-auto">
+        <div className="text-[11px] font-bold text-gray-700 mb-1 uppercase tracking-wider">🎫 Attraction Details</div>
+        
+        <div className="space-y-2 flex-1">
+          {/* Amount Field */}
+          <div>
+            <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase">Spend Amount (₹)</label>
+            <input type="number" className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+              value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
 
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => setIsSelecting(false)}
-              className="flex-1 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-              Cancel
-            </button>
-            <button
-              onClick={handleAdd}
-              className="flex-[2] py-1.5 text-[11px] font-bold text-white bg-gold-500 rounded-xl hover:bg-gold-600 transition-colors">
-              Add to Plan ✓
-            </button>
+          {/* Date Field */}
+          <div>
+            <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase">Visit Date</label>
+            <input type="date" className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+              value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+
+          {/* Time Field */}
+          <div>
+            <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase">Visit Time</label>
+            <input type="time" className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+              value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
         </div>
-      )}
+
+        <div className="flex gap-2 mt-3">
+          <button onClick={() => setIsSelecting(false)} className="flex-1 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-xl">Cancel</button>
+          <button onClick={handleAdd} className="flex-[2] py-1.5 text-[11px] font-bold text-white bg-amber-500 rounded-xl">Add to Plan ✓</button>
+        </div>
+      </div>
+    )}
 
       {/* Image */}
       <div className="relative h-28 overflow-hidden bg-amber-50">

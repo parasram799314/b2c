@@ -141,6 +141,10 @@ const destDataSchema = new mongoose.Schema({
 // ── Main RFQ schema ───────────────────────────────────────────────────────
 const rfqSchema = new mongoose.Schema(
   {
+    // Frontend se aane wala short human-readable ID (e.g. "A24CIM")
+    rfqId: { type: String, default: '' },
+tripName: { type: String, default: '' },
+budget:   { type: Number, default: 0  },
     destinations: [destinationSchema],
 
     requireHotels: { type: Boolean, default: false },
@@ -177,8 +181,9 @@ const rfqSchema = new mongoose.Schema(
       highPriority: { type: Number, default: 0 },
     },
 
-    reviewStatus:  { type: String, default: 'draft' },
+    reviewStatus:  { type: String, default: 'draft' }, // draft | sent | approved | rejected
     reviewSentAt:  { type: String, default: '' },
+    reviewApprovedAt: { type: String, default: '' },
     reviewPayload: { type: mongoose.Schema.Types.Mixed, default: null },
 
     // Visa info

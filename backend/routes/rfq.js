@@ -1,6 +1,7 @@
 // routes/rfqs.js
 import express from 'express';
 import RFQ from '../models/RFQ.js';
+import BudgetApproval from '../models/BudgetApproval.js';
 import { generateItinerary, chatWithItinerary } from '../services/groqService.js';
 import { searchFlights }      from '../services/flightService.js';
 import { searchHotels }       from '../services/hotelService.js';
@@ -121,7 +122,8 @@ async function buildWeatherData(rfqData) {
 // ── POST /api/rfqs ────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const rfqData = req.body;
+    // _id aur __v frontend se aa sakta hai — strip karo warna Mongoose crash karega
+    const { _id, __v, ...rfqData } = req.body;
     console.log('[rfqs] Creating RFQ, destination:', rfqData.destinations?.[0]?.destination);
 
     const [
@@ -240,7 +242,14 @@ router.patch('/:id/checklist', async (req, res) => {
 // ── GET /api/rfqs ─────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const rfqs = await RFQ.find().sort({ createdAt: -1 });
+    const { pendingTripReview, reviewStatus } = req.query;
+    const filter = {};
+    if (pendingTripReview === 'true') {
+      filter.reviewStatus = 'sent';
+    } else if (typeof reviewStatus === 'string' && reviewStatus.length > 0) {
+      filter.reviewStatus = reviewStatus;
+    }
+    const rfqs = await RFQ.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data: rfqs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -259,10 +268,27 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── POST /api/rfqs/:id/send-to-review ─────────────────────────────────────
+// Sirf tab jab budget approval manager ne approve kar di ho
 router.post('/:id/send-to-review', async (req, res) => {
   try {
     const rfq = await RFQ.findById(req.params.id);
     if (!rfq) return res.status(404).json({ success: false, message: 'RFQ not found' });
+
+    const tripKey = String(rfq._id);
+    const ba = await BudgetApproval.findOne({ tripId: tripKey });
+    if (!ba || ba.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: 'Pehle “Send Budget Approval” bhejo aur manager se budget approve karwao. Uske baad hi trip review bhej sakte ho.',
+      });
+    }
+
+    if (rfq.reviewStatus === 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trip pehle se manager-approved (locked) hai.',
+      });
+    }
 
     const payload = req.body || {};
     rfq.reviewStatus = 'sent';
@@ -271,6 +297,43 @@ router.post('/:id/send-to-review', async (req, res) => {
     rfq.markModified('reviewPayload');
     await rfq.save();
 
+    res.json({ success: true, data: rfq });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ── POST /api/rfqs/:id/approve-review ────────────────────────────────────
+router.post('/:id/approve-review', async (req, res) => {
+  try {
+    const rfq = await RFQ.findById(req.params.id);
+    if (!rfq) return res.status(404).json({ success: false, message: 'RFQ not found' });
+    if (rfq.reviewStatus !== 'sent') {
+      return res.status(400).json({
+        success: false,
+        message: 'Is trip par abhi koi pending review request nahi.',
+      });
+    }
+    rfq.reviewStatus = 'approved';
+    rfq.reviewApprovedAt = new Date().toISOString();
+    await rfq.save();
+    res.json({ success: true, data: rfq });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ── POST /api/rfqs/:id/reject-review ─────────────────────────────────────
+router.post('/:id/reject-review', async (req, res) => {
+  try {
+    const rfq = await RFQ.findById(req.params.id);
+    if (!rfq) return res.status(404).json({ success: false, message: 'RFQ not found' });
+    if (rfq.reviewStatus !== 'sent') {
+      return res.status(400).json({ success: false, message: 'Pending review nahi.' });
+    }
+    rfq.reviewStatus = 'rejected';
+    rfq.reviewSentAt = '';
+    await rfq.save();
     res.json({ success: true, data: rfq });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

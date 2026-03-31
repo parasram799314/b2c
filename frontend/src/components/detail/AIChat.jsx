@@ -81,7 +81,7 @@ export default function AIChat({ rfq, onTabSwitch, onResults, onClose }) {
     setLoading(true);
     try {
       const res = await axios.post('/api/rfqs/chat', {
-        rfqId:           rfq?._id,
+        rfqId:           rfq?.rfqId || rfq?._id,
         itinerary:       rfq?.itinerary || '',
         destinations:    rfq?.destinations || [],
         destinationData: rfq?.destinationData || [],

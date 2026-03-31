@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import TripLoader from './TripLoader';
+import TripPlannerTab from './RFQForm/TripPlannerTab';
 
 const CITIES = [
   'Indore, India','Mumbai, India','Delhi, India','Bangalore, India',
@@ -248,23 +249,14 @@ function CityInput({ value, onChange, placeholder, id, style={} }) {
   );
 }
 
-// ─── DESTINATION ROW (Image 1 style) ─────────────────────────
-
-// ─── DESTINATION ROW (Heading and Placeholder Removed) ─────────
-// ─── DESTINATION ROW (Label with dynamic counting) ─────────
-// ─── DESTINATION ROW (Label with dynamic counting) ─────────
-// ─── DESTINATION ROW (Date of Arrival Removed) ─────────
+// ─── DESTINATION ROW ─────────────────────────────────────────
 function DestinationRow({ index, dest, onUpdate, onRemove, canRemove, isFirst }) {
   return (
     <div style={{ marginBottom: '20px' }}>
-      {/* Grid columns updated to 2 (1fr for city, 200px for nights) */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 200px', gap:'14px', alignItems:'start' }}>
-
-        {/* Destination Column */}
+      <div className="rfqDestinationGrid">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
             <label style={{ ...S.label, marginBottom: 0 }}>Destination {index + 1}:</label>
-            
             {canRemove && (
               <button onClick={() => onRemove(index)}
                 style={{ background:'none', border:'none', cursor:'pointer', color:'#e74c3c', padding: 0, display: 'flex', alignItems: 'center' }}>
@@ -272,7 +264,6 @@ function DestinationRow({ index, dest, onUpdate, onRemove, canRemove, isFirst })
               </button>
             )}
           </div>
-          
           <div style={{ ...S.inputBox, paddingRight:'8px' }}
             onFocusCapture={e => e.currentTarget.style.borderColor='#F5A623'}
             onBlurCapture={e => e.currentTarget.style.borderColor='#e4e6f0'}>
@@ -280,18 +271,16 @@ function DestinationRow({ index, dest, onUpdate, onRemove, canRemove, isFirst })
             <span style={{ color:'#aaa', flexShrink:0 }}><IcoLoc size={16}/></span>
           </div>
         </div>
-
-        {/* Number of Nights Column */}
         <div>
           <label style={S.label}>Number Of Nights:</label>
           <Counter value={dest.nights} onChange={n => onUpdate(index, { nights: n })} min={1} max={60}/>
         </div>
-
       </div>
     </div>
   );
 }
-// ─── HOTEL SECTION (Image 3 style) ───────────────────────────
+
+// ─── HOTEL SECTION ───────────────────────────────────────────
 function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers }) {
   const [requireHotel, setRequireHotel] = useState(true);
   const [numRooms, setNumRooms] = useState(1);
@@ -315,7 +304,6 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
 
   return (
     <div style={{ marginBottom:'16px' }}>
-      {/* Hotel required toggle */}
       <div style={{ display:'flex', alignItems:'center', gap:'16px', marginBottom:'20px', fontSize:'15px', fontWeight:700 }}>
         <span>Do you require hotels?</span>
         {[{v:true,l:'Yes'},{v:false,l:'No'}].map(opt => (
@@ -329,8 +317,7 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
 
       {requireHotel && (
         <>
-          {/* City + Dates row */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 180px 180px', gap:'14px', marginBottom:'20px' }}>
+          <div className="rfqHotelCityDatesGrid">
             <div>
               <label style={S.label}>City / Destination:</label>
               <div style={{ ...S.inputBox }}
@@ -362,7 +349,6 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
             </div>
           </div>
 
-          {/* Number of rooms - only show if multiple travelers */}
           {showRoomCounter && (
           <div style={{ display:'flex', alignItems:'center', gap:'16px', marginBottom:'20px' }}>
             <label style={{ fontSize:'14px', fontWeight:700, color:'#1a1a2e', whiteSpace:'nowrap' }}>Number Of Rooms:</label>
@@ -372,7 +358,6 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
           </div>
           )}
 
-          {/* Room cards grid */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(230px, 1fr))', gap:'14px', marginBottom:'20px', overflowX:'auto' }}>
             {rooms.map((room, i) => (
               <div key={i} style={{ border:'1.5px solid #F5A623', borderRadius:'12px', padding:'16px' }}>
@@ -391,7 +376,6 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
             ))}
           </div>
 
-          {/* Hotel Ratings */}
           <div>
             <label style={{ ...S.label, fontSize:'13px' }}>Hotel Ratings: <span style={{ fontWeight:400, color:'#aaa' }}>(Multiple Select)</span></label>
             <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
@@ -431,15 +415,18 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   const [note,         setNote]         = useState('');
 
   const [from, setFrom] = useState(USER_PROFILE.city);
-  const [rfqId] = useState(() => ": "+ Date.now().toString(36).toUpperCase().slice(-6));
+
+  // ✅ FIX: rfqId sirf short display ID hai — MongoDB _id se alag
+  // Format: "A24CIM" (6 char alphanumeric)
+  const [rfqId] = useState(() => Date.now().toString(36).toUpperCase().slice(-6));
+
   const [depDate,     setDepDate]     = useState(null);
   const [showDepCal,  setShowDepCal]  = useState(false);
 
-  // destinations now have: id, city, arrivalDate, nights
   const [destinations, setDestinations] = useState([{ id:1, city:'', arrivalDate:null, nights:1 }]);
-  const [openCal, setOpenCal] = useState(null); // idx
+  const [openCal, setOpenCal] = useState(null);
   const [returnToBase, setReturnToBase] = useState(false);
-  const [tripName, setTripName] = useState(''); // Trip Name state
+  const [tripName, setTripName] = useState('');
 
   const updateDest = (i, patch) => {
     setDestinations(p => p.map((d, idx) => {
@@ -451,7 +438,6 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   const removeDest = (i) => setDestinations(p => p.filter((_,idx) => idx !== i));
   const addDest    = () => {
     setDestinations(p => {
-      // auto-set arrival date for new dest based on last dest arrival + nights
       const last = p[p.length - 1];
       let newArrival = null;
       if (last?.arrivalDate) {
@@ -461,7 +447,6 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
     });
   };
 
-  // When arrivalDate or nights changes on a dest, auto-update next dest's arrivalDate
   useEffect(() => {
     setDestinations(prev => {
       const next = [...prev];
@@ -486,8 +471,7 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   const [showAddTrav,setShowAddTrav]=useState(false);
   const [showPax,setShowPax]=useState(false);
   const [tripHotel,setTripHotel]=useState(false);
-  // Add this near Line 456 with other states
-const [tripRatings, setTripRatings] = useState([]); // State for selected star ratings
+  const [tripRatings, setTripRatings] = useState([]);
   const [tripHotelRooms,setTripHotelRooms]=useState(1);
 
   const [travelers,setTravelers]=useState([{id:'ts',name:USER_PROFILE.name,initials:USER_PROFILE.initials}]);
@@ -499,32 +483,41 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
   ];
 
   const canTrip = destinations[0]?.city.trim() !== "";
-
   const canHotel = hCity.trim() !== "";
 
+  // ✅ FIX: _id nahi bhej rahe — rfqId alag field hai
+  // MongoDB apna khud ka ObjectId _id generate karega
   const handleTripCreate = (aiMode=false) => {
     if(!canTrip) return;
-    const rfq={
-      _id:rfqId, from, tripName,
-      // User ne date nahi bhari isliye default aaj ki date bhej rahe hain
-      depDate: depDate || new Date().toISOString().split('T')[0], 
-      destinations:destinations.map(d=>({ 
-        destination:d.city, 
-        // Arrival date bhi default aaj ki hi jayegi
-        dateOfArrival: d.arrivalDate || new Date().toISOString().split('T')[0], 
-        nights:d.nights 
+    const rfq = {
+      rfqId,                    // ✅ "A24CIM" — display ID, MongoDB _id se alag
+      from,
+      tripName,
+      depDate: depDate || new Date().toISOString().split('T')[0],
+      destinations: destinations.map(d => ({
+        destination:   d.city,
+        dateOfArrival: d.arrivalDate || new Date().toISOString().split('T')[0],
+        numberOfNights: d.nights,    // ✅ model field name: numberOfNights
       })),
-      numberOfAdults:adults, numberOfChildren:children, numberOfInfants:infants,
-      travelClass:tClass, travelType, budget, reviewer:tripReviewer, note,
-      returnToBase, aiGenerate:aiMode, createdAt:new Date().toISOString(), status:'draft',
+      numberOfAdults:   adults,
+      numberOfChildren: children,
+      numberOfInfants:  infants,
+      travelClass:      tClass,
+      travelType,
+      budget,
+      reviewer:         tripReviewer,
+      note,
+      returnToBase,
+      aiGenerate:       aiMode,
+      createdAt:        new Date().toISOString(),
+      status:           'draft',
     };
-      setShowLoader(true);
-        doCollapse();   
-        onSubmit?.(rfq);     // ← ADD
-    
+    setShowLoader(true);
+    doCollapse();
+    onSubmit?.(rfq);
   };
+
   // ── COLLAPSED ──
-  
   if(!expanded){
     return (
       <div style={{width:'100%'}}>
@@ -553,10 +546,10 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
           </div>
         </div>
         {showPrivacy&&<PrivacyModal onClose={()=>setShowPrivacy(false)}/>}
-            <TripLoader                                        
-        isVisible={showLoader}
-        destinations={destinations.map(d => ({ destination: d.city }))}
-      />
+        <TripLoader
+          isVisible={showLoader}
+          destinations={destinations.map(d => ({ destination: d.city }))}
+        />
       </div>
     );
   }
@@ -569,18 +562,49 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
         select option{font-family:inherit;}
         input::placeholder,textarea::placeholder{color:#9ca3af;}
         button:focus{outline:none;}
+        .rfqOverlay{
+          position:fixed;left:0;right:0;bottom:0;top:64px;z-index:9998;
+          display:flex;align-items:flex-start;justify-content:center;
+          background:rgba(0,0,0,0.40);backdrop-filter:blur(3px);
+          padding:16px;overflow-y:auto;
+        }
+        .rfqOverlayInner{
+          position:relative;width:100%;max-width:940px;
+          max-height:calc(100vh - 96px);overflow-y:auto;
+          background:#f7f8fc;border-radius:20px;
+          box-shadow:0 32px 80px rgba(0,0,0,0.22);
+          animation:rfqExpand 0.3s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        @media (max-width:640px){
+          .rfqOverlay{top:56px;padding:12px;}
+          .rfqOverlayInner{max-height:calc(100vh - 80px);}
+        }
+        .rfqDestinationGrid{
+          display:grid;grid-template-columns:1fr 200px;gap:14px;align-items:start;
+        }
+        @media (max-width:640px){
+          .rfqDestinationGrid{grid-template-columns:1fr;gap:10px;}
+        }
+        .rfqHotelCityDatesGrid{
+          display:grid;grid-template-columns:1fr 180px 180px;gap:14px;margin-bottom:20px;
+        }
+        @media (max-width:640px){
+          .rfqHotelCityDatesGrid{grid-template-columns:1fr;gap:12px;margin-bottom:16px;}
+        }
+        @media (min-width:641px) and (max-width:1023px){
+          .rfqHotelCityDatesGrid{grid-template-columns:1fr 1fr;gap:14px;}
+        }
       `}</style>
 
-      <div onClick={doCollapse} style={{position:'fixed',top:'64px',left:0,right:0,bottom:0,zIndex:9998,display:'flex',alignItems:'flex-start',justifyContent:'center',background:'rgba(0,0,0,0.40)',backdropFilter:'blur(3px)',padding:'16px',overflowY:'auto'}}>
-        <div ref={formRef} onClick={e=>e.stopPropagation()}
-          style={{position:'relative',width:'100%',maxWidth:'940px',maxHeight:'calc(100vh - 80px)',overflowY:'auto',background:'#f7f8fc',borderRadius:'20px',boxShadow:'0 32px 80px rgba(0,0,0,0.22)',animation:'rfqExpand 0.3s cubic-bezier(0.22,1,0.36,1) both'}}>
-          <div style={{padding:'28px 32px'}}>
+      <div onClick={doCollapse} className="rfqOverlay">
+        <div ref={formRef} onClick={e=>e.stopPropagation()} className="rfqOverlayInner">
+          <div style={{padding:'clamp(16px, 3vw, 28px) clamp(16px, 4vw, 32px)'}}>
 
             {/* Header */}
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
                 <h2 style={{fontSize:'24px',fontWeight:900,letterSpacing:'-0.02em',color:'#111827',fontFamily:'Georgia,serif',margin:0}}>Book a trip</h2>
-               </div>
+              </div>
               <button onClick={doCollapse} style={{width:'34px',height:'34px',borderRadius:'50%',border:'1.5px solid #e5e7eb',background:'#fff',cursor:'pointer',fontSize:'14px',color:'#9ca3af',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
             </div>
 
@@ -598,58 +622,58 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
             </div>
 
             {/* Tabs */}
-            <div style={{display:'flex',borderBottom:'2px solid #e4e6f0',marginBottom:'24px',background:'#fff',borderRadius:'12px 12px 0 0',padding:'0 4px'}}>
+            <div style={{display:'flex',borderBottom:'2px solid #e4e6f0',marginBottom:'24px',background:'#fff',borderRadius:'12px 12px 0 0',padding:'0 4px',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
               {TABS.map(({id,icon})=>(
                 <button key={id} onClick={()=>setActiveTab(id)}
                   style={{display:'flex',alignItems:'center',gap:'7px',padding:'13px 20px',fontSize:'13px',whiteSpace:'nowrap',border:'none',borderBottom:`2px solid ${activeTab===id?'#F5A623':'transparent'}`,background:'transparent',cursor:'pointer',color:activeTab===id?'#111827':'#9ca3af',fontWeight:activeTab===id?700:400,marginBottom:'-2px'}}>
                   <span style={{color:activeTab===id?'#F5A623':'#9ca3af'}}>{icon}</span>{id}
                 </button>
               ))}
-              {/* Traveler pill pushed to right */}
-           
             </div>
 
             {/* White content card */}
             <div style={{ background:'#fff', borderRadius:'14px', padding:'24px', marginBottom:'16px', border:'1px solid #e4e6f0' }}>
 
-              {/* ── FLIGHTS ── */}
+              {/* ── FLIGHTS TAB ── */}
               {activeTab==='Flights' && (
                 <div>
-                  {/* NEW: Trip Name and Status Row */}
-  <div style={{ display:'flex', gap:'14px', marginBottom:'20px' }}>
-  <div style={{ flex: 1 }}>
-    <label style={S.label}>Trip Name:</label>
-    <div style={S.inputBox}>
-      <input 
-        value={tripName} 
-        onChange={e => setTripName(e.target.value)} 
-        placeholder="Enter trip name (e.g. Summer Vacation)" 
-        style={S.inputText} 
-      />
-    </div>
-  </div>
-  <div style={{ width:'280px', flexShrink:0 }}>
-    <label style={S.label}>Status:</label>
-    <div style={{ ...S.inputBox, border:'1.5px solid #e5e7eb', borderRadius:'10px', background:'#fff', justifyContent:'space-between' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-        <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0 }}/>
-        <span style={{ fontSize:'14px', fontWeight:700, color:'#374151' }}>DRAFT</span>
-      </div>
-      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-        <span style={{ fontSize:'12px', color:'#9ca3af', fontWeight:500 }}>Trip ID:</span>
-        <span style={{ fontSize:'12px', fontWeight:700, color:'#D97706' }}>{rfqId.replace(': ','')}</span>
-        <span style={{ color:'#9ca3af', fontSize:'10px' }}>▾</span>
-      </div>
-    </div>
-  </div>
-</div>
+                  {/* Trip Name + Status row */}
+                  <div style={{ display:'flex', gap:'14px', marginBottom:'20px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={S.label}>Trip Name:</label>
+                      <div style={S.inputBox}>
+                        <input
+                          value={tripName}
+                          onChange={e => setTripName(e.target.value)}
+                          placeholder="Enter trip name (e.g. Summer Vacation)"
+                          style={S.inputText}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ width:'280px', flexShrink:0 }}>
+                      <label style={S.label}>Status:</label>
+                      <div style={{ ...S.inputBox, border:'1.5px solid #e5e7eb', borderRadius:'10px', background:'#fff', justifyContent:'space-between' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                          <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0 }}/>
+                          <span style={{ fontSize:'14px', fontWeight:700, color:'#374151' }}>OPEN</span>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                          <span style={{ fontSize:'12px', color:'#9ca3af', fontWeight:500 }}>Trip ID:</span>
+                          {/* ✅ rfqId directly — no ': ' prefix anymore */}
+                          <span style={{ fontSize:'12px', fontWeight:700, color:'#D97706' }}>{rfqId}</span>
+                          <span style={{ color:'#9ca3af', fontSize:'10px' }}>▾</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* From row */}
                   <div style={{ display:'flex', alignItems:'flex-end', gap:'14px', marginBottom:'24px', flexWrap:'wrap' }}>
                     <div style={{ minWidth:'200px', flex:1 }}>
                       <label style={S.label}>From:</label>
                       <div style={{ ...S.inputBox, background:'#f7f8fc' }}
-                      onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
-                      onBlurCapture={e=>e.currentTarget.style.borderColor='#e4e6f0'}>
+                        onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
+                        onBlurCapture={e=>e.currentTarget.style.borderColor='#e4e6f0'}>
                         <span style={{color:'#9ca3af',flexShrink:0}}><IcoTakeoff size={14}/></span>
                         <CityInput value={from} onChange={setFrom} placeholder="Departure city" id="from_city"/>
                       </div>
@@ -683,307 +707,46 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
                         style={{ accentColor:'#F5A623', width:'15px', height:'15px', cursor:'pointer' }}/>
                       Return to base
                     </label>
-                    
+                  </div>
+
+                  {/* ✅ Create Trip button */}
+                  <div style={{ marginTop:'24px', display:'flex', justifyContent:'flex-end' }}>
+                    <button
+                      onClick={() => handleTripCreate(false)}
+                      disabled={!canTrip}
+                      style={{
+                        padding:'12px 32px', fontSize:'14px', fontWeight:800,
+                        background: canTrip ? '#F5A623' : '#f3f4f6',
+                        color: canTrip ? '#fff' : '#9ca3af',
+                        border:'none', borderRadius:'12px',
+                        cursor: canTrip ? 'pointer' : 'not-allowed',
+                        boxShadow: canTrip ? '0 4px 14px rgba(245,166,35,0.4)' : 'none',
+                        transition:'all 0.2s',
+                      }}
+                      onMouseEnter={e=>{ if(canTrip) e.currentTarget.style.background='#E09510'; }}
+                      onMouseLeave={e=>{ if(canTrip) e.currentTarget.style.background='#F5A623'; }}
+                    >
+                      Create Trip →
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* ── HOTELS ── */}
+              {/* ── HOTELS TAB ── */}
               {activeTab==='Hotels' && (
                 <HotelSection hCity={hCity} setHCity={setHCity} onOpenHCal={setShowHCal} hCI={hCI} hCO={hCO} totalTravelers={totalPax}/>
               )}
 
-              {/* ── TRIP PLANNER ── */}
-              {activeTab==='Trip Planner' && (
-                <div>
-{/* Trip Name, Status aur Trip ID - Customized Design */}
-<div style={{ display:'flex', gap:'14px', marginBottom:'20px', alignItems: 'flex-end' }}>
-  
-  {/* 1. Trip Name (Input Field) */}
-  <div style={{ flex: 1 }}>
-    <label style={S.label}>Trip Name:</label>
-    <div style={S.inputBox}>
-      <input 
-        value={tripName} 
-        onChange={e => setTripName(e.target.value)} 
-        placeholder="Enter trip name (e.g. Summer Vacation)" 
-        style={S.inputText} 
-      />
-    </div>
-  </div>
-
-  {/* 2. Status Box (Non-changeable, Traveler button style) */}
-  <div style={{ width:'130px', flexShrink:0 }}>
-    <label style={S.label}>Status:</label>
-    <div style={{ 
-      ...S.inputBox, 
-      background:'#fff', 
-      border:'1.5px solid #e5e7eb', 
-      cursor:'default', 
-      userSelect:'none' 
-    }}>
-      <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#9ca3af', flexShrink:0, marginRight:'8px' }}/>
-      <span style={{ fontSize:'14px', fontWeight:700, color:'#374151' }}>DRAFT</span>
-    </div>
-  </div>
-
-  {/* 3. Trip ID Box (No Heading, Text Inside Box, Non-changeable) */}
-  <div style={{ width:'180px', flexShrink:0 }}>
-    {/* Iske upar label nahi hai as per requirement */}
-    <div style={{ 
-      ...S.inputBox, 
-      background:'#fff', 
-      border:'1.5px solid #e5e7eb', 
-      cursor:'default', 
-      userSelect:'none',
-      justifyContent: 'center'
-    }}>
-      <span style={{ fontSize:'12px', color:'#9ca3af', fontWeight:600, marginRight:'6px' }}>Trip ID:</span>
-      <span style={{ fontSize:'14px', fontWeight:700, color:'#D97706' }}>{rfqId.replace(': ','')}</span>
-    </div>
-  </div>
-</div>
-                  {/* From + Departure row */}
-                  <div style={{ display:'flex', alignItems:'flex-end', gap:'14px', marginBottom:'24px', flexWrap:'wrap' }}>
-                    <div style={{ minWidth:'200px', flex:1 }}>
-                      <label style={S.label}>From:</label>
-                      <div style={{ ...S.inputBox, background:'#f7f8fc' }}
-                      onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
-                      onBlurCapture={e=>e.currentTarget.style.borderColor='#e4e6f0'}>
-                        <span style={{color:'#9ca3af',flexShrink:0}}><IcoTakeoff size={14}/></span>
-                        <CityInput value={from} onChange={setFrom} placeholder="Departure city" id="from_city"/>
-                      </div>
-                    </div>
-                    <div style={{ minWidth:'180px' }}>
-                      <label style={S.label}>Departure Date:</label>
-                      <button onClick={()=>setShowDepCal(true)}
-                        style={{ ...S.inputBox, width:'100%', cursor:'pointer', justifyContent:'space-between' }}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor='#F5A623'}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor='#e4e6f0'}>
-                        <span style={{fontSize:'14px',fontWeight:600,color:depDate?'#1a1a2e':'#aaa'}}>{depDate?fmt(depDate):'Select date'}</span>
-                        <span style={{color:'#aaa',flexShrink:0}}><IcoCalendar size={15}/></span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {destinations.map((dest,i) => (
-                    <DestinationRow key={dest.id} index={i} dest={dest} onUpdate={updateDest} onRemove={removeDest} canRemove={destinations.length>1} onOpenCal={idx=>setOpenCal(idx)} isFirst={i===0}/>
-                  ))}
-
-                  {/* Add destination + Return to base */}
-                  <div style={{ display:'flex', alignItems:'center', gap:'12px', marginTop:'8px', flexWrap:'wrap' }}>
-                    <button onClick={addDest}
-                      style={{ display:'flex', alignItems:'center', gap:'8px', padding:'10px 22px', fontSize:'13px', fontWeight:700, color:'#fff', background:'#F5A623', border:'none', borderRadius:'24px', cursor:'pointer', transition:'background 0.15s' }}
-                      onMouseEnter={e=>e.currentTarget.style.background='#E09510'}
-                      onMouseLeave={e=>e.currentTarget.style.background='#F5A623'}>
-                      <IcoPlus size={13}/> Add Destination
-                    </button>
-                   <label style={{ display:'flex', alignItems:'center', gap:'7px', cursor:'pointer', fontSize:'13px', fontWeight:600, color:'#374151', marginLeft:'8px' }}>
-  <input type="checkbox" checked={returnToBase} onChange={e=>setReturnToBase(e.target.checked)}
-    style={{ accentColor:'#F5A623', width:'15px', height:'15px', cursor:'pointer' }}/>
-  Return to base
-  <div style={{ position:'relative', display:'inline-flex', alignItems:'center' }}
-    onMouseEnter={e => {
-      const tip = e.currentTarget.querySelector('.tip');
-      if (tip) tip.style.display = 'block';
-    }}
-    onMouseLeave={e => {
-      const tip = e.currentTarget.querySelector('.tip');
-      if (tip) tip.style.display = 'none';
-    }}
-  >
-    <span style={{
-      width:'15px', height:'15px', borderRadius:'50%',
-      background:'#e5e7eb', color:'#6b7280',
-      fontSize:'9px', fontWeight:900,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      cursor:'help', userSelect:'none',
-    }}>i</span>
-    <div className="tip" style={{
-      display:'none',
-      position:'absolute', bottom:'22px', left:'50%',
-      transform:'translateX(-50%)',
-      background:'#1f2937', color:'#fff',
-      fontSize:'11px', fontWeight:600,
-      padding:'5px 10px', borderRadius:'7px',
-      whiteSpace:'nowrap', zIndex:9999,
-      boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
-      pointerEvents:'none',
-    }}>
-      Return flight to starting destination
-      <div style={{
-        position:'absolute', top:'100%', left:'50%',
-        transform:'translateX(-50%)',
-        borderLeft:'5px solid transparent',
-        borderRight:'5px solid transparent',
-        borderTop:'5px solid #1f2937',
-      }}/>
-    </div>
-  </div>
-</label>
-                     <button onClick={()=>setShowPax(true)}
-    style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', border:'1.5px solid #e5e7eb', borderRadius:'999px', padding:'7px 16px', cursor:'pointer', background:'#fff', color:'#374151', transition:'border-color 0.15s', marginLeft:'12px' }}
-    onMouseEnter={e=>e.currentTarget.style.borderColor='#F5A623'}
-    onMouseLeave={e=>e.currentTarget.style.borderColor='#e5e7eb'}>
-    <IcoUser size={13}/>
-    <span style={{fontWeight:700}}>{totalPax} Traveler{totalPax>1?'s':''}</span>
-    <span style={{fontSize:'11px',color:'#9ca3af'}}>{tClass}</span>
-    <span style={{color:'#9ca3af',fontSize:'10px'}}>▾</span>
-  </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* ── HOTEL REQUIREMENT ROW (Trip Planner only) ── */}
-{/* ── HOTEL REQUIREMENT ROW (Updated with Ratings) ── */}
-      {activeTab === 'Trip Planner' && (
-        <div style={{ background: '#fff', borderRadius: '14px', padding: '16px 20px', marginBottom: '16px', border: '1px solid #e4e6f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: tripHotel ? '16px' : '0' }}>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap' }}>Do you require hotels?</span>
-            {[{ v: true, l: 'Yes' }, { v: false, l: 'No' }].map(opt => (
-              <label key={opt.l} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}>
-                <input 
-                  type="radio" 
-                  name="tripHotelReq" 
-                  checked={tripHotel === opt.v} 
-                  onChange={() => setTripHotel(opt.v)}
-                  style={{ accentColor: '#F5A623', width: '16px', height: '16px' }} 
+              {/* ── TRIP PLANNER TAB ── */}
+              {activeTab === 'Trip Planner' && (
+                <TripPlannerTab
+                  rfqId={rfqId}
+                  onSubmit={onSubmit}
+                  loading={loading}
                 />
-                {opt.v && tripHotel ? <span style={{ color: '#F5A623' }}>{opt.l}</span> : opt.l}
-              </label>
-            ))}
-
-            {tripHotel && totalPax > 1 && (
-              <>
-                <div style={{ width: '1px', height: '28px', background: '#e4e6f0', flexShrink: 0 }} />
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap' }}>Number Of Rooms:</span>
-                <div style={{ width: '140px' }}>
-                  <Counter value={tripHotelRooms} onChange={setTripHotelRooms} min={1} max={10} />
-                </div>
-              </>
-            )}
-          </div>
-
-          {tripHotel && (
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
-              <label style={{ ...S.label, fontSize: '12px', marginBottom: '10px' }}>
-                Preferred Hotel Ratings: <span style={{ fontWeight: 400, color: '#aaa', textTransform: 'none' }}>(Multiple Select)</span>
-              </label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {[1, 2, 3, 4, 5].map(star => {
-                  const isSelected = tripRatings.includes(star);
-                  return (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setTripRatings(prev => 
-                        isSelected ? prev.filter(s => s !== star) : [...prev, star]
-                      )}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', borderRadius: '8px',
-                        border: `1.5px solid ${isSelected ? '#F5A623' : '#e4e6f0'}`,
-                        background: isSelected ? '#FFF3DC' : '#fff',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: 700,
-                        color: isSelected ? '#D97706' : '#6b7280', transition: 'all 0.15s'
-                      }}
-                    >
-                     <span style={{ fontSize: '11px' }}>{star} Star</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-            {/* ── TRAVELERS + BUDGET + REVIEWER ROW ── */}
-            <div style={{ background:'#fff', borderRadius:'14px', padding:'16px 20px', marginBottom:'16px', border:'1px solid #e4e6f0', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
-              {/* Travelers (left side) */}
-              <div style={{ display:'flex', alignItems:'center', gap:'8px', flex:1, flexWrap:'wrap', minWidth:0 }}>
-                {travelers.map(t=>(
-                  <div key={t.id} style={{display:'flex',alignItems:'center',gap:'8px',border:'1.5px solid #e5e7eb',borderRadius:'999px',padding:'5px 10px 5px 5px',background:'#fff',fontSize:'13px'}}>
-                    <div style={{width:'24px',height:'24px',borderRadius:'50%',background:'#F5A623',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',fontWeight:700,color:'#fff',flexShrink:0}}>{t.initials}</div>
-                    <span style={{fontWeight:500,color:'#1f2937'}}>{t.name}</span>
-                    {t.id!=='ts'&&<button onClick={()=>setTravelers(p=>p.filter(x=>x.id!==t.id))} style={{color:'#9ca3af',fontSize:'10px',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}>✕</button>}
-                  </div>
-                ))}
-                <button onClick={()=>setShowAddTrav(true)} style={{display:'flex',alignItems:'center',gap:'6px',border:'1.5px dashed #d1d5db',borderRadius:'999px',padding:'5px 12px',fontSize:'13px',color:'#6b7280',cursor:'pointer',background:'#fff'}}>⊕ Add travelers</button>
-              </div>
-
-              {/* Budget + Reviewer (right side) */}
-              <div style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0, flexWrap:'wrap' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'6px', border:'1.5px solid #e5e7eb', borderRadius:'999px', padding:'5px 12px', background:'#fff' }}
-                  onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
-                  onBlurCapture={e=>e.currentTarget.style.borderColor='#e5e7eb'}>
-                  <IcoBudget size={13}/>
-                  <span style={{fontSize:'12px',color:'#9ca3af',fontWeight:600}}>₹</span>
-                  <input type="number" value={budget} onChange={e=>setBudget(e.target.value)} placeholder="Budget"
-                    style={{background:'transparent',border:'none',outline:'none',fontSize:'13px',fontWeight:600,color:'#374151',width:'80px',fontFamily:'inherit'}}/>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:'6px', border:'1.5px solid #e5e7eb', borderRadius:'999px', padding:'5px 12px', background:'#fff' }}
-                  onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
-                  onBlurCapture={e=>e.currentTarget.style.borderColor='#e5e7eb'}>
-                  <span style={{fontSize:'12px',color:'#9ca3af'}}>👤</span>
-                  <select value={tripReviewer} onChange={e=>setTripReviewer(e.target.value)}
-                    style={{background:'transparent',border:'none',outline:'none',fontSize:'13px',fontWeight:600,color:tripReviewer?'#374151':'#9ca3af',cursor:'pointer',fontFamily:'inherit',minWidth:'90px'}}>
-                    <option value="">Reviewer</option>
-                    <option>Trushant Shah</option><option>Tushar</option><option>Rahul</option>
-                    <option>Priya</option><option>Amit</option><option>Neha</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* ── NOTE BOX ── */}
-            <div style={{ marginBottom:'20px' }}>
-              <div style={{display:'flex',alignItems:'flex-start',gap:'10px',border:'1.5px solid #e4e6f0',borderRadius:'14px',padding:'12px 16px',background:'#fff',transition:'border-color 0.15s'}}
-                onFocusCapture={e=>e.currentTarget.style.borderColor='#F5A623'}
-                onBlurCapture={e=>e.currentTarget.style.borderColor='#e4e6f0'}>
-                <span style={{color:'#9ca3af',marginTop:'2px',flexShrink:0}}><IcoNote size={14}/></span>
-                <div style={{flex:1}}>
-                  <p style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'#9ca3af',marginBottom:'4px',lineHeight:1}}>Notes (optional)</p>
-                  <textarea value={note} onChange={e=>setNote(e.target.value)}
-                    placeholder="Add any special requirements, preferred hotels, meeting schedule, visa notes..."
-                    rows={2}
-                    style={{width:'100%',background:'transparent',border:'none',outline:'none',fontSize:'13px',fontWeight:500,color:'#374151',fontFamily:'inherit',resize:'none',lineHeight:1.5}}/>
-                </div>
-              </div>
-            </div>
-
-            {/* ── CTAs ── */}
-            <div style={{display:'flex',gap:'12px',paddingTop:'14px',borderTop:'1px solid #e4e6f0'}}>
-              {activeTab==='Flights'&&(
-                <button onClick={()=>{if(!canTrip||loading)return;const rfq={destinations:destinations.map(d=>({destination:d.city,dateOfArrival:d.arrivalDate,nights:d.nights})),guestCountry:from,numberOfAdults:adults,numberOfChildren:children,numberOfInfants:infants,travelClass:tClass,tripType:'multi',serviceType:'Flights',travelType,budget,reviewer:tripReviewer,note,returnToBase};onSubmit?.(rfq);}}
-                  disabled={!canTrip||loading}
-                  style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'14px',borderRadius:'12px',border:'none',background:canTrip?'#F5A623':'#f3f4f6',color:canTrip?'#fff':'#9ca3af',fontSize:'14px',fontWeight:700,cursor:canTrip?'pointer':'not-allowed',boxShadow:canTrip?'0 6px 20px rgba(245,166,35,0.35)':'none',transition:'all 0.2s'}}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                  {loading?'Searching...':'Search Flights'}
-                </button>
               )}
-              {activeTab==='Hotels'&&(
-                <button onClick={()=>{if(!canHotel)return;const nights=hCI&&hCO?Math.max(1,Math.round((new Date(hCO)-new Date(hCI))/86400000)):1;onAddToPlan?.([{id:'hotel_'+Date.now(),type:'hotel',dayIndex:0,name:hCity,checkIn:hCI,checkOut:hCO,nights,label:`🏨 ${hCity}`,sublabel:`Check-in: ${fmt(hCI)}${hCO?' · Check-out: '+fmt(hCO):''}`,status:'pending',price:5000}]);doCollapse();}}
-                  disabled={!canHotel}
-                  style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'14px',borderRadius:'12px',border:'none',background:canHotel?'#F5A623':'#f3f4f6',color:canHotel?'#fff':'#9ca3af',fontSize:'14px',fontWeight:700,cursor:canHotel?'pointer':'not-allowed',boxShadow:canHotel?'0 6px 20px rgba(245,166,35,0.35)':'none',transition:'all 0.2s'}}>
-                  ＋ Add Hotel to Plan
-                </button>
-              )}
-              {activeTab==='Trip Planner'&&(
-                <>
-                  <button onClick={()=>handleTripCreate(false)} disabled={!canTrip}
-                    style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'14px',borderRadius:'12px',border:'none',background:canTrip?'#F5A623':'#f3f4f6',color:canTrip?'#fff':'#9ca3af',fontSize:'14px',fontWeight:700,cursor:canTrip?'pointer':'not-allowed',boxShadow:canTrip?'0 6px 20px rgba(245,166,35,0.35)':'none',transition:'all 0.2s'}}>
-                    <IcoNote size={14}/> Create Trip Manually
-                  </button>
-                  <button onClick={()=>handleTripCreate(true)} disabled={!canTrip}
-                    style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'14px',borderRadius:'12px',border:'none',background:canTrip?'linear-gradient(135deg,#6366f1,#8b5cf6)':'#f3f4f6',color:canTrip?'#fff':'#9ca3af',fontSize:'14px',fontWeight:700,cursor:canTrip?'pointer':'not-allowed',boxShadow:canTrip?'0 6px 20px rgba(99,102,241,0.35)':'none',transition:'all 0.2s'}}>
-                    ✨ AI Generate
-                  </button>
-                </>
-              )}
-            </div>
 
+            </div>
           </div>
         </div>
       </div>
@@ -1000,10 +763,10 @@ const [tripRatings, setTripRatings] = useState([]); // State for selected star r
       {showPrivacy&&<PrivacyModal onClose={()=>setShowPrivacy(false)}/>}
       {showAddTrav&&<AddTravelerModal onClose={()=>setShowAddTrav(false)} onAdd={t=>setTravelers(p=>[...p,t])}/>}
       {showPax&&<PassengersModal adults={adults} children={children} infants={infants} travelClass={tClass} onUpdate={(a,c,i,tc)=>{setAdults(a);setChildren(c);setInfants(i);setTClass(tc);}} onClose={()=>setShowPax(false)}/>}
-     <TripLoader                                                  
-        isVisible={showLoader}                                      
-        destinations={destinations.map(d => ({ destination: d.city }))} 
-      />  
+      <TripLoader
+        isVisible={showLoader}
+        destinations={destinations.map(d => ({ destination: d.city }))}
+      />
     </>
   );
 }

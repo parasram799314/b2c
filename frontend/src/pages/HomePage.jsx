@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import RFQForm from '../components/RFQForm';
 import { ItineraryCard } from '../ui';
+import { Icons } from '../ui/icons';
 import heroBg from '../assets/hero-bg.png';
+import axios from 'axios';
+import { useAuth } from '../role-auth/role-auth/src/context/AuthContext';
+import ManagerApprovalsSection from '../components/ManagerPanel';
 
 // ─── TP Profile Form Popup ────────────────────────────────────────────────────
 function TpProfilePopup({ onClose }) {
@@ -49,8 +53,13 @@ function TpProfilePopup({ onClose }) {
       boxShadow: '0 10px 40px rgba(0,0,0,0.18)', border: '1px solid #f3f4f6',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 800, color: '#111827' }}>👤 My Profile</div>
-        <button onClick={onClose} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        <div style={{ display:'flex', alignItems:'center', gap:'8px', fontSize: '13px', fontWeight: 800, color: '#111827' }}>
+          <Icons.User size={15} />
+          My Profile
+        </div>
+        <button onClick={onClose} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icons.X size={14} />
+        </button>
       </div>
 
       {field('Full Name',    'fullName', 'text',   'Trushant Shah')}
@@ -86,30 +95,110 @@ export default function HomePage({
   onOpenItinerary,
   onDeleteItinerary,
   onAddToPlan,
+  currentUser,
 }) {
-  console.log('HomePage - Props received:', { 
-    itinerariesLength: itineraries.length, 
-    itineraries,
-    hasOnSubmit: !!onSubmit,
-    hasOnOpenItinerary: !!onOpenItinerary,
-    hasOnDeleteItinerary: !!onDeleteItinerary 
-  });
-  
-  const [page, setPage]         = useState(1);
+  const { user, logout } = useAuth();
+  const isManager = user?.role === 'manager';
+  const [budgetApprovals, setBudgetApprovals] = useState([]);
+  const [tripReviews, setTripReviews] = useState([]);
+  const [approvalsLoading, setApprovalsLoading] = useState(false);
+
+  // Load both budget approvals and trip reviews when manager clicks Approvals tab
+  // Load both budget approvals and trip reviews when manager clicks Approvals tab
+  // ─── LIVE SYNC: हर 5 सेकंड में मैनेजर का डेटा ऑटोमैटिक अपडेट होगा ───
+  useEffect(() => {
+    if (!isManager) return;
+    
+    const fetchData = async (isFirstLoad = false) => {
+      // सिर्फ पहली बार लोडिंग स्पिनर दिखाओ, बार-बार नहीं
+      if (isFirstLoad) setApprovalsLoading(true);
+      
+      try {
+        // दोनों API को एक साथ कॉल करें (Faster Performance)
+        const [budgetRes, tripRes] = await Promise.all([
+          axios.get('/api/budget-approvals?status=pending'),
+          axios.get('/api/rfqs?pendingTripReview=true')
+        ]);
+
+        if (budgetRes.data?.success) {
+          setBudgetApprovals(budgetRes.data.data || []);
+        }
+
+        if (tripRes.data?.success) {
+          setTripReviews(tripRes.data.data || []);
+        }
+      } catch (err) {
+        console.error('Auto-sync failed:', err);
+      } finally {
+        if (isFirstLoad) setApprovalsLoading(false);
+      }
+    };
+
+    // 1. तुरंत लोड करें
+    fetchData(true);
+
+    // 2. हर 5 सेकंड में बैकग्राउंड में नया डेटा चेक करें
+    const syncInterval = setInterval(() => {
+      fetchData(false);
+    }, 5000); 
+
+    // 3. सफाई (Cleanup): जब मैनेजर पेज छोड़ेगा तो चेकिंग बंद हो जाएगी
+    return () => clearInterval(syncInterval);
+  }, [isManager]);
+
+  const handleApprove = async (tripId) => {
+    try {
+      await axios.patch(`/api/budget-approvals/${tripId}`, {
+        status: 'approved',
+        approvedBudget: null, // Use original budget
+        managerComment: ''
+      });
+      // Refresh list
+      setBudgetApprovals(prev => prev.filter(a => a.tripId !== tripId));
+    } catch (err) {
+      alert('Failed to approve: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleReject = async (tripId) => {
+    try {
+      await axios.patch(`/api/budget-approvals/${tripId}`, {
+        status: 'rejected',
+        managerComment: 'Rejected by manager'
+      });
+      // Refresh list
+      setBudgetApprovals(prev => prev.filter(a => a.tripId !== tripId));
+    } catch (err) {
+      alert('Failed to reject: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleTripApprove = async (tripId) => {
+    try {
+      await axios.post(`/api/rfqs/${tripId}/approve-review`);
+      setTripReviews(prev => prev.filter(t => t._id !== tripId));
+    } catch (err) {
+      alert('Failed to approve trip: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleTripReject = async (tripId) => {
+    try {
+      await axios.post(`/api/rfqs/${tripId}/reject-review`);
+      setTripReviews(prev => prev.filter(t => t._id !== tripId));
+    } catch (err) {
+      alert('Failed to reject trip: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const [page, setPage]             = useState(1);
   const [showTpForm, setShowTpForm] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
 
   const pageSize     = 6;
   const totalPages   = Math.max(1, Math.ceil(itineraries.length / pageSize));
   const safePage     = Math.min(page, totalPages);
   const visibleItins = itineraries.slice((safePage - 1) * pageSize, safePage * pageSize);
-  
-  console.log('HomePage - Calculated values:', { 
-    pageSize, 
-    totalPages, 
-    safePage, 
-    visibleItinsLength: visibleItins.length,
-    visibleItins 
-  });
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-gray-900">
@@ -120,30 +209,51 @@ export default function HomePage({
           <div className="flex items-center gap-2">
             <img src="https://travplatforms.com/images/logo3.png" alt="TravPlatforms" style={{ height: '35px', objectFit: 'contain' }} />
           </div>
-
-          <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* User display */}
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              {user?.name || user?.email}
+            </span>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowTpForm(v => !v)}
+                style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: '#fff', border: '2px solid rgba(0,0,0,0.08)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11px', fontWeight: 700, color: '#374151',
+                  boxShadow: showTpForm ? '0 0 0 3px rgba(247,190,57,0.4)' : 'none',
+                  transition: 'box-shadow 0.2s',
+                }}
+              >
+                TP
+              </button>
+              {showTpForm && <TpProfilePopup onClose={() => setShowTpForm(false)} />}
+            </div>
             <button
-              onClick={() => setShowTpForm(v => !v)}
+              onClick={logout}
               style={{
-                width: '36px', height: '36px', borderRadius: '50%',
-                background: '#fff', border: '2px solid rgba(0,0,0,0.08)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '11px', fontWeight: 700, color: '#374151',
-                boxShadow: showTpForm ? '0 0 0 3px rgba(247,190,57,0.4)' : 'none',
-                transition: 'box-shadow 0.2s',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '18px',
+                fontWeight: 700,
+                color: '#6b7280',
+                paddingBottom: '8px',
+                borderBottom: '2px solid transparent',
+                transition: 'all 0.2s',
               }}
             >
-              TP
+              Logout
             </button>
-            {showTpForm && <TpProfilePopup onClose={() => setShowTpForm(false)} />}
           </div>
         </div>
       </header>
 
       {/* ── HERO ── */}
       <div
-        className="relative w-full"
-        style={{ backgroundImage: `url(${heroBg})`, backgroundSize: 'cover', backgroundPosition: 'center', height: '420px' }}
+        className="relative w-full h-[320px] sm:h-[420px] md:h-[460px]"
+        style={{ backgroundImage: `url(${heroBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
       >
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.20) 45%, rgba(0,0,0,0.40) 100%)' }} />
         <div className="absolute inset-x-0 top-0 flex flex-col items-center justify-center text-center px-4" style={{ height: '58%' }}>
@@ -157,17 +267,12 @@ export default function HomePage({
         </div>
       </div>
 
-      {/* ── SEARCH CARD ──
-           Now always compact — the RFQForm handles its own fixed-center modal when expanded
-      ── */}
+      {/* ── SEARCH CARD ── */}
       <div
         className="relative mx-auto w-full px-4 sm:px-6"
-        style={{ maxWidth: '520px', marginTop: '-36px', zIndex: 20 }}
+        style={{ maxWidth: '520px', marginTop: 'clamp(-26px, -5vw, -36px)', zIndex: 20 }}
       >
-        <div
-          className="bg-white rounded-2xl"
-          style={{ padding: '18px 22px 22px', boxShadow: '0 8px 40px rgba(0,0,0,0.16)' }}
-        >
+        <div className="bg-white rounded-2xl" style={{ padding: '18px 22px 22px', boxShadow: '0 8px 40px rgba(0,0,0,0.16)' }}>
           <RFQForm
             onSubmit={onSubmit}
             loading={loading}
@@ -177,58 +282,94 @@ export default function HomePage({
           />
           {error && (
             <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-600 text-sm flex items-start gap-2">
-              <span>⚠️</span><span>{error}</span>
+              <span className="mt-0.5"><Icons.Warning size={16} /></span><span>{error}</span>
             </div>
           )}
         </div>
       </div>
 
       {/* ── ITINERARIES ── */}
+{/* ── ITINERARIES ── */}
       <main className="flex-1 bg-[#F9FAFB] mt-8">
-        {/* Debug Info */}
-        {console.log('HomePage - itineraries:', itineraries.length, itineraries)}
-        {console.log('HomePage - visibleItins:', visibleItins.length, visibleItins)}
-        
         {itineraries.length > 0 ? (
           <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8" style={{ paddingBottom: '60px' }}>
+
+            {/* Tab row */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-lg text-gray-800" style={{ borderBottom: '2px solid #9e8240', paddingBottom: '8px' }}>Recent Itineraries</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <h2
+                  onClick={() => setShowApprovals(false)}
+                  className="font-bold text-lg cursor-pointer"
+                  style={{
+                    color: !showApprovals ? '#111827' : '#6b7280',
+                    paddingBottom: '8px',
+                    borderBottom: !showApprovals ? '2px solid #9e8240' : '2px solid transparent',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  Recent Itineraries
+                </h2>
+
+                {isManager && (
+                  <button
+                    onClick={() => setShowApprovals(true)} // यहाँ true किया गया है
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: showApprovals ? '#111827' : '#6b7280',
+                      paddingBottom: '8px',
+                      borderBottom: showApprovals ? '2px solid #9e8240' : '2px solid transparent',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    Approvals
+                  </button>
+                )}
+              </div>
               <span className="text-sm text-gray-400">({itineraries.length})</span>
             </div>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleItins.map(rfq => (
-                <ItineraryCard key={rfq._id} rfq={rfq} onOpen={onOpenItinerary} onDelete={onDeleteItinerary} />
-              ))}
-            </div>
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2 text-xs">
-                <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
-                  className={`px-3 py-1.5 rounded-full border ${safePage === 1 ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-500'}`}>Prev</button>
-                {Array.from({ length: totalPages }).map((_, i) => {
-                  const p = i + 1, active = p === safePage;
-                  return (
-                    <button key={p} type="button" onClick={() => setPage(p)}
-                      className={`w-7 h-7 rounded-full text-xs font-semibold border ${active ? 'text-white' : 'bg-white text-gray-600 border-gray-200 hover:opacity-80'}`}
-                      style={active ? { background: 'linear-gradient(135deg,#c9a227,#9e8240)', borderColor: '#9e8240' } : {}}>
-                      {p}
-                    </button>
-                  );
-                })}
-                <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
-                  className={`px-3 py-1.5 rounded-full border ${safePage === totalPages ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-500'}`}>Next</button>
-              </div>
+
+            {/* Content Area */}
+         {showApprovals ? (
+  <ManagerApprovalsSection
+    budgetApprovals={budgetApprovals}
+    tripReviews={tripReviews}
+    approvalsLoading={approvalsLoading}
+    onApprove={handleApprove}
+    onReject={handleReject}
+    onTripApprove={handleTripApprove}
+    onTripReject={handleTripReject}
+  />
+) : (
+              // Normal Itineraries View
+              <>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {visibleItins.map(rfq => (
+                    <ItineraryCard key={rfq._id} rfq={rfq} onOpen={onOpenItinerary} onDelete={onDeleteItinerary} />
+                  ))}
+                </div>
+                {/* Pagination logic here */}
+              </>
             )}
           </section>
         ) : (
-          <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8" style={{ paddingBottom: '60px' }}>
+          // Empty State (When no itineraries at all)
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
             <div className="text-center py-16">
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-white shadow-sm border border-gray-100 flex items-center justify-center mb-4">
+                <Icons.MapPin size={26} className="text-gray-400" />
+              </div>
+              
               <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>No Itineraries Yet</h3>
               <p style={{ fontSize: '14px', color: '#9ca3af' }}>Create your first trip to see it here!</p>
             </div>
           </section>
         )}
       </main>
+
     </div>
   );
 }
