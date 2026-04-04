@@ -9,6 +9,9 @@ import { searchAttractions }  from '../services/attractionService.js';
 import { searchRestaurants }  from '../services/restaurantService.js';
 import { getWeatherForecast } from '../services/weatherService.js';
 import { buildChecklist }     from '../services/checklistService.js';
+import { verifyToken } from '../middleware/auth.js';
+import User from '../models/User.js';
+
 
 const router = express.Router();
 
@@ -120,9 +123,12 @@ async function buildWeatherData(rfqData) {
 }
 
 // ── POST /api/rfqs ────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     // _id aur __v frontend se aa sakta hai — strip karo warna Mongoose crash karega
+    const createdBy = req.uid;
+const userDoc = await User.findOne({ uid: req.uid });
+const assignedTo = userDoc?.managerId || '';
     const { _id, __v, ...rfqData } = req.body;
     console.log('[rfqs] Creating RFQ, destination:', rfqData.destinations?.[0]?.destination);
 
@@ -144,6 +150,8 @@ router.post('/', async (req, res) => {
 
     const rfq = new RFQ({
       ...rfqData,
+      createdBy,
+assignedTo,
       requireHotels: true, // ✅ FIX: DB mein bhi true save karo
       itinerary,
       travelType,
@@ -164,16 +172,56 @@ router.post('/', async (req, res) => {
 });
 
 // ── POST /api/rfqs/chat ───────────────────────────────────────────────────
-router.post('/chat', async (req, res) => {
+const DAILY_TOKEN_LIMIT = 2000;
+const TOKENS_PER_CHAR_IN  = 0.25;
+const TOKENS_PER_CHAR_OUT = 0.25;
+
+// routes/rfqs.js mein /chat route ko pura replace karein:
+// routes/rfqs.js mein /chat route ko pura replace karein:
+router.post('/chat', verifyToken, async (req, res) => {
   try {
     const { itinerary, destinations, message } = req.body;
-    const reply = await chatWithItinerary({ itinerary, destinations, message });
-    res.json({ success: true, reply });
+    const user = await User.findOne({ uid: req.uid });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // --- 1. RESET LOGIC (Sahi Tarika) ---
+    const now = new Date();
+    const last = new Date(user.chatTokens.lastReset || now);
+    
+    // Agar dates match nahi karti (toDateString use karne se time ka lafda khatam)
+    if (now.toDateString() !== last.toDateString()) {
+      user.chatTokens.used = 0;
+      user.chatTokens.lastReset = now;
+      await user.save();
+    }
+
+    if (user.chatTokens.used >= DAILY_TOKEN_LIMIT) {
+      return res.status(403).json({ success: false, message: 'Daily limit reached' });
+    }
+
+    // --- 2. AI REPLY ---
+    const result = await chatWithItinerary({ itinerary, destinations, message });
+    const reply = result.reply;
+
+    // --- 3. TOKEN CALCULATION ---
+    // Char count ke basis par (0.25 tokens per character)
+    const totalMsgTokens = Math.ceil((message.length + reply.length) * 0.25);
+    
+    // DB Update
+    user.chatTokens.used = Math.min(user.chatTokens.used + totalMsgTokens, DAILY_TOKEN_LIMIT);
+    await user.save();
+
+    // Frontend ko fresh data wapas bhejo
+    res.json({
+      success: true,
+      reply,
+      used: user.chatTokens.used, // Backend se fresh count
+      remaining: Math.max(0, DAILY_TOKEN_LIMIT - user.chatTokens.used)
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 // ── POST /api/rfqs/:id/flights ────────────────────────────────────────────
 router.post('/:id/flights', async (req, res) => {
   try {
@@ -240,17 +288,43 @@ router.patch('/:id/checklist', async (req, res) => {
 });
 
 // ── GET /api/rfqs ─────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const { pendingTripReview, reviewStatus } = req.query;
     const filter = {};
+    const currentUser = await User.findOne({ uid: req.uid });
+    if (currentUser?.role === 'manager' || currentUser?.role === 'hr') {
+      filter.assignedTo = req.uid;
+    } else {
+      filter.createdBy = req.uid;
+    }
+    
     if (pendingTripReview === 'true') {
       filter.reviewStatus = 'sent';
     } else if (typeof reviewStatus === 'string' && reviewStatus.length > 0) {
-      filter.reviewStatus = reviewStatus;
+      if (reviewStatus.includes(',')) {
+        filter.reviewStatus = { $in: reviewStatus.split(',').map(s => s.trim()) };
+      } else {
+        filter.reviewStatus = reviewStatus;
+      }
     }
+    
     const rfqs = await RFQ.find(filter).sort({ createdAt: -1 });
-    res.json({ success: true, data: rfqs });
+
+    // Manually join with User to get names
+    const uids = [...new Set(rfqs.map(r => r.createdBy))];
+    const users = await User.find({ uid: { $in: uids } }, 'uid name email');
+    const userMap = users.reduce((acc, u) => {
+      acc[u.uid] = u.name || u.email;
+      return acc;
+    }, {});
+
+    const dataWithNames = rfqs.map(r => ({
+      ...r.toObject(),
+      createdByName: userMap[r.createdBy] || 'Unknown User'
+    }));
+
+    res.json({ success: true, data: dataWithNames });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

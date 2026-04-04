@@ -1,10 +1,22 @@
 // components/detail/PlanPanel.jsx
 import { useEffect, useMemo, useState } from 'react';
+import { fmt, getResolvedDate, getLogoUrl } from '../shared/PlanCard';
+
 
 const TYPE_ICONS  = { flight:'✈️', hotel:'🏨', attraction:'🗺️', restaurant:'🍽️', transfer:'🚗' };
 const TYPE_COLORS = { flight:'bg-blue-50 border-blue-100', hotel:'bg-amber-50 border-amber-100', attraction:'bg-green-50 border-green-100', restaurant:'bg-orange-50 border-orange-100', transfer:'bg-gray-50 border-gray-100' };
 const TRANSPORT_ICONS = { cab:'🚕', metro:'🚇', bus:'🚌', rental:'🚗', train:'🚆', ferry:'⛴️' };
 
+
+function SectionDivider({ label }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:'8px', margin:'8px 0 6px' }}>
+      <div style={{ flex:1, height:'1px', background:'#f3f4f6' }} />
+      <span style={{ fontSize:'10px', fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:'0.07em', whiteSpace:'nowrap' }}>{label}</span>
+      <div style={{ flex:1, height:'1px', background:'#f3f4f6' }} />
+    </div>
+  );
+}
 function fmtDate(d) {
   if (!d) return null;
   try {
@@ -98,6 +110,132 @@ function PlanItem({ item, onRemove, status }) {
       {!isPaid && (
         <button onClick={()=>onRemove(item.id)} className="w-5 h-5 rounded-full bg-white border border-gray-200 hover:bg-red-50 hover:border-red-200 text-gray-400 hover:text-red-400 flex items-center justify-center text-[10px] transition-all flex-shrink-0 mt-0.5">✕</button>
       )}
+    </div>
+  );
+}
+
+// ─── BookView ──────────────────────────────────────────────────────────────────
+export function BookView({ planItems, onClose, onPay, viewMode, setViewMode }) {
+  // Sirf pending items filter karein
+  const pendingItems = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled');
+  
+  // Selection state: Shuruat mein sab selected honge
+  const [selectedIds, setSelectedIds] = useState(pendingItems.map(p => p.id));
+
+  const toggleItem = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const isAllSelected = selectedIds.length === pendingItems.length && pendingItems.length > 0;
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]); // Sab uncheck kar do
+    } else {
+      setSelectedIds(pendingItems.map(p => p.id)); // Sab check kar do
+    }
+  };
+  const handlePay = () => { 
+    if (selectedIds.length === 0) return;
+    onPay(selectedIds); 
+    onClose(); 
+  };
+  // Grouping logic (Day-wise ya Item-wise)
+  const byDate = {};
+  pendingItems.forEach(item => {
+    const d = getResolvedDate(item);
+    const dk = d ? fmtDate(d) : 'No Date';
+    if (!byDate[dk]) byDate[dk] = [];
+    byDate[dk].push(item);
+  });
+
+  const renderItem = (item) => {
+    const isChecked = selectedIds.includes(item.id);
+    const title = item.type === 'flight' ? `${item.from || ''} to ${item.to || ''}` : item.hotelName || item.name || item.type;
+    const logoSrc = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
+
+    return (
+      <div 
+        key={item.id} 
+        onClick={() => toggleItem(item.id)}
+        style={{ 
+          border: '1px solid', borderRadius: '12px', padding: '12px', marginBottom: '10px', 
+          display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+          borderColor: isChecked ? 'rgb(247,190,57)' : '#e5e7eb',
+          background: isChecked ? '#fffdf5' : '#fff'
+        }}
+      >
+        <input 
+          type="checkbox" 
+          checked={isChecked} 
+          onChange={() => {}} // Click div par handle ho raha hai
+          style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)', cursor: 'pointer' }} 
+        />
+        
+        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {item.type === 'flight' && logoSrc ? <img src={logoSrc} style={{ width: '100%', objectFit: 'contain' }} /> : <span>{item.type === 'hotel' ? '🏨' : '📍'}</span>}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{title}</div>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>
+            {item.price ? fmt(item.price) : 'Price on request'} • {item.type.toUpperCase()}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', padding: '5px 10px', cursor: 'pointer' }}>back</button>
+          <span style={{ fontSize: '14px', fontWeight: 900 }}>BOOK ALL ITEMS</span>
+        </div>
+        <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '10px' }}>
+          {[{ v: 'daywise', l: 'Day-wise' }, { v: 'itemwise', l: 'Item-wise' }].map(opt => (
+            <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer', background: viewMode === opt.v ? '#fff' : 'transparent', color: viewMode === opt.v ? '#111827' : '#6b7280' }}>{opt.l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Select All Toolbar */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#374151' }}>
+          <input 
+            type="checkbox" 
+            checked={isAllSelected} 
+            onChange={handleSelectAll} 
+            style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)' }} 
+          />
+          Select All ({pendingItems.length})
+        </label>
+        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{selectedIds.length} items selected</span>
+      </div>
+
+      {/* List Area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '15px 20px' }}>
+        {Object.entries(byDate).map(([dateLabel, items]) => (
+          <div key={dateLabel}>
+            <SectionDivider label={dateLabel} />
+            {items.map(renderItem)}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6', background: '#fff' }}>
+        <button 
+          onClick={handlePay} 
+          disabled={selectedIds.length === 0}
+          style={{ width: '100%', padding: '14px', background: selectedIds.length > 0 ? 'rgb(247,190,57)' : '#e5e7eb', color: '#1a1a1a', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 900, cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed', marginBottom: '10px' }}
+        >
+          Pay for {selectedIds.length} Item{selectedIds.length !== 1 ? 's' : ''}
+        </button>
+        <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}>Back to plan</button>
+      </div>
     </div>
   );
 }

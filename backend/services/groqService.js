@@ -125,5 +125,8 @@ INSTRUCTIONS:
     max_tokens:  500,
   });
 
-  return completion.choices[0]?.message?.content || 'Sorry, I could not process that.';
+  return {
+    reply: completion.choices[0]?.message?.content || 'Sorry, I could not process that.',
+    usage: completion.usage // contains prompt_tokens, completion_tokens, total_tokens
+  };
 }

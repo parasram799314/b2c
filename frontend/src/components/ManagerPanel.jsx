@@ -1,7 +1,7 @@
 // ─── ManagerApprovalsSection.jsx ─────────────────────────────────────────────
 // Drop-in replacement for the approvals section in HomePage.jsx
 // Props: budgetApprovals, tripReviews, approvalsLoading, onApprove, onReject, onTripApprove, onTripReject
-
+import PlanCard from './shared/PlanCard';
 import { useState } from 'react';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,10 +96,8 @@ function PlanItemRow({ item }) {
 // ── BudgetApprovalCard ────────────────────────────────────────────────────────
 function BudgetApprovalCard({ approval, onApprove, onReject }) {
   const [expanded, setExpanded] = useState(false);
-  const over     = approval.grandTotal - approval.budget;
-  const overBudget = over > 0;
-  const destList =
-    (approval.destinations || []).map(d => d.destination).filter(Boolean).join(', ') || '—';
+  const [note, setNote] = useState('');
+
   const pax =
     (approval.numberOfAdults || 1) +
     (approval.numberOfChildren || 0) +
@@ -110,74 +108,85 @@ function BudgetApprovalCard({ approval, onApprove, onReject }) {
       background: '#fff', borderRadius: '14px',
       border: '1.5px solid #e5e7eb', overflow: 'hidden', marginBottom: '12px',
     }}>
-      {/* Header row */}
-      <div style={{ padding: '14px 16px' }}>
-        {/* Top: name + date + action buttons */}
-       
+      {/* SINGLE ROW */}
+      <div style={{
+        padding: '14px 18px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+      }}>
 
-        {/* Budget vs Grand Total */}
-        {/* 1. Header: Trip Name, ID, User, Pax और Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div>
-            <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#111827', margin: '0 0 4px 0', textTransform: 'uppercase' }}>
+        {/* LEFT: Trip info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>
               {approval.tripName || 'Untitled Trip'}
-            </h4>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#6b7280' }}>
-              <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '10px', border: '1px solid #fde68a' }}>
-                ID: {approval.rfqId || (approval.tripId ? approval.tripId.slice(-6).toUpperCase() : 'N/A')}
-              </span>
-              <span>•</span>
-              <span>{fmtDate(approval.sentAt || approval.createdAt)}</span>
-              <span>•</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                👤 <span style={{ fontWeight: 600, color: '#374151' }}>{approval.requestedBy || 'User'}</span>
-              </span>
-              <span>•</span>
-              <span style={{ fontWeight: 600 }}>{pax} Pax</span>
-            </div>
+            </span>
+            <span style={{ fontSize: '10px', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '5px', border: '1px solid #fde68a' }}>
+              ID: {approval.rfqId || (approval.tripId ? approval.tripId.slice(-6).toUpperCase() : 'N/A')}
+            </span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              {fmtDate(approval.sentAt || approval.createdAt)}
+            </span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              · {approval.requestedByName || 'user'} · {pax} Pax
+            </span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              · {(approval.destinations || []).map(d => d.destination).filter(Boolean).join(', ') || '—'}
+            </span>
+          </div>
+        </div>
+
+        {/* RIGHT: Budget + Divider + Note + Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+
+          {/* Budget amount */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+            <span style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+              Requested budget
+            </span>
+            <span style={{ fontSize: '18px', fontWeight: 800, color: '#1e40af', whiteSpace: 'nowrap' }}>
+              {fmt(approval.budget)}
+            </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            <button onClick={() => onReject(approval.tripId)} style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
-              Reject
-            </button>
-            <button onClick={() => onApprove(approval.tripId)} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+          {/* Vertical divider */}
+          <div style={{ width: '1px', height: '40px', background: '#e5e7eb', flexShrink: 0 }} />
+
+          {/* Note textarea */}
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Add a note..."
+            rows={2}
+            style={{
+              width: '180px', fontSize: '11px', border: '1px solid #e5e7eb',
+              borderRadius: '8px', padding: '6px 8px', outline: 'none',
+              resize: 'none', fontFamily: 'inherit', color: '#111827',
+              background: '#fafafa', boxSizing: 'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = 'rgb(247,190,57)'}
+            onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+          />
+
+          {/* Approve + Reject stacked */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <button
+              onClick={() => onApprove(approval.tripId, note)}
+              style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
               Approve
             </button>
+            <button
+              onClick={() => onReject(approval.tripId, note)}
+              style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Reject
+            </button>
           </div>
-        </div>
 
-        {/* 2. 3-Box Stats: Requested, Total, Difference */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-          <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '12px', textAlign: 'center', border: '1px solid #dbeafe' }}>
-            <div style={{ fontSize: '9px', fontWeight: 800, color: '#1e40af', opacity: 0.8, textTransform: 'uppercase', marginBottom: '4px' }}>Requested Budget</div>
-            <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e40af' }}>{fmt(approval.budget)}</div>
-          </div>
-          <div style={{ background: overBudget ? '#fef2f2' : '#f0fdf4', borderRadius: '12px', padding: '12px', textAlign: 'center', border: overBudget ? '1px solid #fee2e2' : '1px solid #dcfce7' }}>
-            <div style={{ fontSize: '9px', fontWeight: 800, color: overBudget ? '#b91c1c' : '#166534', opacity: 0.8, textTransform: 'uppercase', marginBottom: '4px' }}>Grand Total</div>
-            <div style={{ fontSize: '18px', fontWeight: 900, color: overBudget ? '#b91c1c' : '#166534' }}>{fmt(approval.grandTotal)}</div>
-          </div>
-          <div style={{ background: overBudget ? '#fef2f2' : '#f0fdf4', borderRadius: '12px', padding: '12px', textAlign: 'center', border: overBudget ? '1px solid #fee2e2' : '1px solid #dcfce7' }}>
-            <div style={{ fontSize: '9px', fontWeight: 800, color: overBudget ? '#b91c1c' : '#166534', opacity: 0.8, textTransform: 'uppercase', marginBottom: '4px' }}>{overBudget ? 'Over By' : 'Within By'}</div>
-            <div style={{ fontSize: '18px', fontWeight: 900, color: overBudget ? '#b91c1c' : '#166534' }}>{fmt(Math.abs(over))}</div>
-          </div>
-        </div>
-
-        {/* Destinations row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>📍 Destinations:</span>
-          {(approval.destinations || []).map((d, i) => (
-            <span key={i} style={{
-              fontSize: '10px', fontWeight: 600, padding: '2px 9px', borderRadius: '20px',
-              background: '#f3f4f6', color: '#374151',
-            }}>
-              {d.destination}
-            </span>
-          ))}
         </div>
       </div>
 
-      {/* Plan items toggle */}
+      {/* Plan items toggle - same as before */}
       {(approval.planItems || []).length > 0 && (
         <>
           <div
@@ -189,20 +198,16 @@ function BudgetApprovalCard({ approval, onApprove, onReject }) {
             }}
           >
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
-              🗒 View {approval.planItems.length} plan items
+              🗒 View {approval.planItems.length} plan item{approval.planItems.length !== 1 ? 's' : ''}
             </span>
-            <svg
-              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af"
-              strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
               <path d="M6 9l6 6 6-6"/>
             </svg>
           </div>
-
           {expanded && (
             <div style={{ padding: '12px 14px', background: '#f9fafb', borderTop: '1px solid #f3f4f6' }}>
               {approval.planItems.map((item, i) => (
-                <PlanItemRow key={item.id || i} item={item} />
+                <PlanCard key={item.id || i} item={item} readOnlyPlan={true} onRemove={() => {}} onReorder={() => {}} />
               ))}
             </div>
           )}
@@ -215,112 +220,103 @@ function BudgetApprovalCard({ approval, onApprove, onReject }) {
 // ── TripReviewCard ────────────────────────────────────────────────────────────
 function TripReviewCard({ trip, onApprove, onReject }) {
   const [expanded, setExpanded] = useState(false);
-  const payload   = trip.reviewPayload || {};
-  const planItems = payload.planItems || [];
+  const [note, setNote] = useState('');
+  const payload    = trip.reviewPayload || {};
+  const planItems  = payload.planItems || [];
   const grandTotal = payload.grandTotal || 0;
-
-  const destList =
-    (trip.destinations || []).map(d => d.destination).filter(Boolean).join(' → ') || '—';
 
   const pax =
     (trip.numberOfAdults || 1) +
     (trip.numberOfChildren || 0) +
     (trip.numberOfInfants || 0);
 
-  // Count by type
-  const counts = planItems.reduce((acc, item) => {
-    acc[item.type] = (acc[item.type] || 0) + 1;
-    return acc;
-  }, {});
-
   return (
     <div style={{
       background: '#fff', borderRadius: '14px',
       border: '1.5px solid #e5e7eb', overflow: 'hidden', marginBottom: '12px',
     }}>
-      {/* Header */}
-      <div style={{ padding: '14px 16px' }}>
-        {/* Top row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: '#111827', marginBottom: '3px' }}>
+      {/* SINGLE ROW — same layout as BudgetApprovalCard */}
+      <div style={{
+        padding: '14px 18px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+      }}>
+
+        {/* LEFT: Trip info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>
               {trip.tripName || 'Untitled Trip'}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              {trip.rfqId && (
-                <span style={{ fontSize: '9px', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  ID: {trip.rfqId}
-                </span>
-              )}
-              <span style={{ fontSize: '10px', color: '#9ca3af' }}>
-                {fmtDate(trip.reviewSentAt || trip.updatedAt)}
+            </span>
+            {trip.rfqId && (
+              <span style={{ fontSize: '10px', fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '5px', border: '1px solid #fde68a' }}>
+                ID: {trip.rfqId}
               </span>
-              <span style={{ fontSize: '10px', color: '#9ca3af' }}>·</span>
-              <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: 600 }}>{pax} Pax</span>
-            </div>
+            )}
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              {fmtDate(trip.reviewSentAt || trip.updatedAt)}
+            </span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              · {trip.createdByName || 'user'} · {pax} Pax
+            </span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              · {(trip.destinations || []).map(d => d.destination).filter(Boolean).join(' → ') || '—'}
+            </span>
+          </div>
+        </div>
+
+        {/* RIGHT: Grand Total + Divider + Note + Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+
+          {/* Grand total amount */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+            <span style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+              Grand Total
+            </span>
+            <span style={{ fontSize: '18px', fontWeight: 800, color: '#166534', whiteSpace: 'nowrap' }}>
+              {grandTotal > 0 ? fmt(grandTotal) : '—'}
+            </span>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          {/* Vertical divider */}
+          <div style={{ width: '1px', height: '40px', background: '#e5e7eb', flexShrink: 0 }} />
+
+          {/* Note textarea */}
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Add a note..."
+            rows={2}
+            style={{
+              width: '180px', fontSize: '11px', border: '1px solid #e5e7eb',
+              borderRadius: '8px', padding: '6px 8px', outline: 'none',
+              resize: 'none', fontFamily: 'inherit', color: '#111827',
+              background: '#fafafa', boxSizing: 'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = 'rgb(247,190,57)'}
+            onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+          />
+
+          {/* Approve + Reject stacked */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button
-              onClick={() => onReject(trip._id)}
-              style={{
-                padding: '7px 14px', borderRadius: '8px', border: '1px solid #fca5a5',
-                background: '#fff', color: '#dc2626', fontSize: '11px', fontWeight: 700,
-                cursor: 'pointer',
-              }}
+              onClick={() => onApprove(trip._id, note)}
+              style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: 'rgb(247,190,57)', color: '#1a1a1a', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#e6ad2a'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgb(247,190,57)'}
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => onReject(trip._id, note)}
+              style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
               onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
               onMouseLeave={e => e.currentTarget.style.background = '#fff'}
             >
               Reject
             </button>
-            <button
-              onClick={() => onApprove(trip._id)}
-              style={{
-                padding: '7px 14px', borderRadius: '8px', border: 'none',
-                background: 'rgb(247,190,57)', color: '#1a1a1a',
-                fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#e6ad2a'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgb(247,190,57)'}
-            >
-              Approve Trip
-            </button>
           </div>
-        </div>
 
-        {/* Route + Grand Total */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-          <div style={{
-            flex: 1, background: '#f9fafb', borderRadius: '9px', padding: '9px 12px',
-            fontSize: '11px', fontWeight: 600, color: '#374151',
-          }}>
-            📍 {destList}
-          </div>
-          {grandTotal > 0 && (
-            <div style={{ background: '#f0fdf4', borderRadius: '9px', padding: '9px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: '9px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Total</div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#166534' }}>{fmt(grandTotal)}</div>
-            </div>
-          )}
         </div>
-
-        {/* Item type summary chips */}
-        {Object.keys(counts).length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {Object.entries(counts).map(([type, count]) => {
-              const meta = TYPE_META[type] || TYPE_META.other;
-              return (
-                <span key={type} style={{
-                  fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
-                  background: meta.bg, color: meta.color,
-                }}>
-                  {meta.icon} {count} {meta.label}{count > 1 ? 's' : ''}
-                </span>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Plan items toggle */}
@@ -335,43 +331,17 @@ function TripReviewCard({ trip, onApprove, onReject }) {
             }}
           >
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
-              🗒 Review {planItems.length} items in detail
+              🗒 Review {planItems.length} plan item{planItems.length !== 1 ? 's' : ''}
             </span>
-            <svg
-              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af"
-              strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
               <path d="M6 9l6 6 6-6"/>
             </svg>
           </div>
-
           {expanded && (
             <div style={{ padding: '12px 14px', background: '#f9fafb', borderTop: '1px solid #f3f4f6' }}>
-              {/* Group by type */}
-              {Object.entries(
-                planItems.reduce((acc, item) => {
-                  const t = item.type || 'other';
-                  if (!acc[t]) acc[t] = [];
-                  acc[t].push(item);
-                  return acc;
-                }, {})
-              ).map(([type, items]) => {
-                const meta = TYPE_META[type] || TYPE_META.other;
-                return (
-                  <div key={type} style={{ marginBottom: '14px' }}>
-                    <div style={{
-                      fontSize: '10px', fontWeight: 700, color: '#6b7280',
-                      textTransform: 'uppercase', letterSpacing: '0.06em',
-                      marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px',
-                    }}>
-                      <span>{meta.icon}</span> {meta.label}s ({items.length})
-                    </div>
-                    {items.map((item, i) => (
-                      <PlanItemRow key={item.id || i} item={item} />
-                    ))}
-                  </div>
-                );
-              })}
+              {planItems.map((item, i) => (
+                <PlanCard key={item.id || i} item={item} readOnlyPlan={true} onRemove={() => {}} onReorder={() => {}} />
+              ))}
             </div>
           )}
         </>
@@ -379,18 +349,18 @@ function TripReviewCard({ trip, onApprove, onReject }) {
     </div>
   );
 }
-
 // ── Main ManagerApprovalsSection ──────────────────────────────────────────────
 export default function ManagerApprovalsSection({
   budgetApprovals = [],
   tripReviews     = [],
+  historyItems    = [],   // 👈 naya prop
   approvalsLoading,
   onApprove,
   onReject,
   onTripApprove,
   onTripReject,
 }) {
-  const [tab, setTab] = useState('budget');
+  const [tab, setTab] = useState('approvals');
 
   if (approvalsLoading) {
     return (
@@ -400,14 +370,18 @@ export default function ManagerApprovalsSection({
     );
   }
 
+ // ❌ PURANA tabs array aur pura return block hatao, NAYA yeh lagao:
+
+  const totalPending = budgetApprovals.length + tripReviews.length;
+
   const tabs = [
-    { id: 'budget', label: '💰 Budget Approvals', count: budgetApprovals.length },
-    { id: 'trip',   label: '✈️ Trip Reviews',      count: tripReviews.length    },
+    { id: 'approvals', label: '🔔 Approvals', count: totalPending },
+    { id: 'history',   label: '📋 History',   count: historyItems.length },
   ];
 
   return (
     <div>
-      {/* Sub-tabs */}
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: '#f3f4f6', borderRadius: '10px', padding: '4px' }}>
         {tabs.map(t => (
           <button
@@ -424,8 +398,8 @@ export default function ManagerApprovalsSection({
             {t.label}
             {t.count > 0 && (
               <span style={{
-                marginLeft: '6px', fontSize: '10px', fontWeight: 800, padding: '1px 6px',
-                borderRadius: '20px',
+                marginLeft: '6px', fontSize: '10px', fontWeight: 800,
+                padding: '1px 6px', borderRadius: '20px',
                 background: tab === t.id ? 'rgb(247,190,57)' : '#e5e7eb',
                 color: tab === t.id ? '#1a1a1a' : '#6b7280',
               }}>
@@ -436,51 +410,109 @@ export default function ManagerApprovalsSection({
         ))}
       </div>
 
-      {/* Budget Approvals tab */}
-      {tab === 'budget' && (
+      {/* ── APPROVALS TAB — Budget + Trip dono ── */}
+      {tab === 'approvals' && (
         <div>
-          {budgetApprovals.length === 0 ? (
-            <div style={{
-              background: '#fff', borderRadius: '12px', padding: '40px 20px',
-              textAlign: 'center', border: '1.5px dashed #e5e7eb',
-            }}>
+          {totalPending === 0 ? (
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', border: '1.5px dashed #e5e7eb' }}>
               <div style={{ fontSize: '28px', marginBottom: '10px' }}>🎉</div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No pending budget requests</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No pending approvals</div>
               <div style={{ fontSize: '11px', color: '#9ca3af' }}>All caught up!</div>
             </div>
           ) : (
-            budgetApprovals.map(approval => (
-              <BudgetApprovalCard
-                key={approval._id}
-                approval={approval}
-                onApprove={onApprove}
-                onReject={onReject}
-              />
-            ))
+            <>
+              {/* Budget Approvals */}
+              {budgetApprovals.length > 0 && (
+                <>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>💰 Budget Approvals</span>
+                    <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: '20px', fontSize: '10px' }}>{budgetApprovals.length}</span>
+                  </div>
+                  {budgetApprovals.map(approval => (
+                    <BudgetApprovalCard key={approval._id} approval={approval} onApprove={onApprove} onReject={onReject} />
+                  ))}
+                </>
+              )}
+
+              {/* Trip Reviews */}
+              {tripReviews.length > 0 && (
+                <>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: budgetApprovals.length > 0 ? '20px' : '0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>✈️ Trip Reviews</span>
+                    <span style={{ background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: '20px', fontSize: '10px' }}>{tripReviews.length}</span>
+                  </div>
+                  {tripReviews.map(trip => (
+                    <TripReviewCard key={trip._id} trip={trip} onApprove={onTripApprove} onReject={onTripReject} />
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       )}
 
-      {/* Trip Reviews tab */}
-      {tab === 'trip' && (
+      {/* ── HISTORY TAB ── */}
+      {tab === 'history' && (
         <div>
-          {tripReviews.length === 0 ? (
-            <div style={{
-              background: '#fff', borderRadius: '12px', padding: '40px 20px',
-              textAlign: 'center', border: '1.5px dashed #e5e7eb',
-            }}>
-              <div style={{ fontSize: '28px', marginBottom: '10px' }}>✅</div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No pending trip reviews</div>
-              <div style={{ fontSize: '11px', color: '#9ca3af' }}>All trips reviewed!</div>
+          {historyItems.length === 0 ? (
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', border: '1.5px dashed #e5e7eb' }}>
+              <div style={{ fontSize: '28px', marginBottom: '10px' }}>📋</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No history yet</div>
+              <div style={{ fontSize: '11px', color: '#9ca3af' }}>Approved/Rejected items will appear here</div>
             </div>
           ) : (
-            tripReviews.map(trip => (
-              <TripReviewCard
-                key={trip._id}
-                trip={trip}
-                onApprove={onTripApprove}
-                onReject={onTripReject}
-              />
+            historyItems.map((item, i) => (
+              <div key={item._id || i} style={{
+                background: '#fff', borderRadius: '12px', border: '1.5px solid #e5e7eb',
+                padding: '14px 18px', marginBottom: '10px',
+                display: 'flex', alignItems: 'center', gap: '14px',
+              }}>
+                {/* Status Icon */}
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '10px', flexShrink: 0,
+                  background: item.status === 'approved' ? '#dcfce7' : '#fee2e2',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+                }}>
+                  {item.status === 'approved' ? '✅' : '❌'}
+                </div>
+
+                {/* Trip Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>
+                      {item.tripName || 'Untitled Trip'}
+                    </span>
+                    {/* Type badge */}
+                    <span style={{
+                      fontSize: '9px', fontWeight: 800, padding: '2px 7px', borderRadius: '5px',
+                      background: item.type === 'budget' ? '#fef3c7' : '#dbeafe',
+                      color: item.type === 'budget' ? '#92400e' : '#1e40af',
+                      border: `1px solid ${item.type === 'budget' ? '#fde68a' : '#bfdbfe'}`,
+                    }}>
+                      {item.type === 'budget' ? '💰 BUDGET' : '✈️ TRIP REVIEW'}
+                    </span>
+                    {item.rfqId && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, background: '#f3f4f6', color: '#6b7280', padding: '2px 6px', borderRadius: '4px' }}>
+                        ID: {item.rfqId}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <span>🕐 {fmtDate(item.resolvedAt || item.updatedAt)}</span>
+                    {item.managerComment && <span>💬 "{item.managerComment}"</span>}
+                    {item.approvedBudget && <span>💰 {fmt(item.approvedBudget)}</span>}
+                  </div>
+                </div>
+
+                {/* Status badge */}
+                <span style={{
+                  fontSize: '11px', fontWeight: 800, padding: '4px 12px', borderRadius: '8px', flexShrink: 0,
+                  background: item.status === 'approved' ? '#dcfce7' : '#fee2e2',
+                  color: item.status === 'approved' ? '#166534' : '#991b1b',
+                }}>
+                  {item.status === 'approved' ? 'Approved' : 'Rejected'}
+                </span>
+              </div>
             ))
           )}
         </div>

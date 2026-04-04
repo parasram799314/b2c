@@ -185,6 +185,10 @@ budget:   { type: Number, default: 0  },
     reviewSentAt:  { type: String, default: '' },
     reviewApprovedAt: { type: String, default: '' },
     reviewPayload: { type: mongoose.Schema.Types.Mixed, default: null },
+    
+    createdBy:  { type: String, default: '' }, // Firebase UID
+assignedTo: { type: String, default: '' }, // Manager ka Firebase UID
+companyId:  { type: String, default: '' },
 
     // Visa info
    visaInfo: {

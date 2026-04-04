@@ -3,6 +3,9 @@ import axios from 'axios';
 import HomePage from './pages/HomePage';
 import DetailPage from './pages/DetailPage';
 
+import './utils/axiosConfig'
+import HRDashboard from './pages/HRDashboard'
+
 
 // ── Role Auth Imports ─────────────────────────────────────────
 import { AuthProvider, useAuth }   from './role-auth/role-auth/src/context/AuthContext';
@@ -13,7 +16,7 @@ import ManagerPage                 from './role-auth/role-auth/src/pages/Manager
 // ─────────────────────────────────────────────────────────────
 //  Main App Logic (original — kuch nahi badla)
 // ─────────────────────────────────────────────────────────────
-function UserApp() {
+function UserApp({ onOpenHRDashboard, onOpenManagerPanel }) {
   const [page, setPage] = useState('home');
   const { user } = useAuth(); 
   const [loading, setLoading] = useState(false);
@@ -38,21 +41,15 @@ function UserApp() {
   }, []);
 
   // 2. Form Submit — Atlas mein save karo
- // App.jsx — UserApp ke andar handleSubmit function
 const handleSubmit = async (formData) => {
   setLoading(true);
   setError('');
   try {
     const res = await axios.post('/api/rfqs', formData);
-    
-    // ✅ FIX: formData + backend response merge karo
-    // formData mein tripName, budget hain
-    // res.data.data mein _id, itinerary etc hain
     const newRfq = {
-      ...formData,       // tripName, budget pehle spread karo
-      ...res.data.data,  // backend se aaya data override karega (_id, itinerary etc)
+      ...formData,
+      ...res.data.data,
     };
-    
     setItineraries(prev => [newRfq, ...prev]);
     setCurrentRfq(newRfq);
     setPage('detail');
@@ -63,7 +60,6 @@ const handleSubmit = async (formData) => {
   setLoading(false);
 };
 
-  // 3. Delete — Atlas se delete karo
   const handleDelete = async (id) => {
     try {
       await axios.delete(`/api/rfqs/${id}`);
@@ -100,7 +96,9 @@ const handleSubmit = async (formData) => {
         setPage('detail');
       }}
       onDeleteItinerary={handleDelete}
-      currentUser={user}  // ✅ yeh add karo
+      currentUser={user}
+      onOpenHRDashboard={onOpenHRDashboard}
+      onOpenManagerPanel={onOpenManagerPanel}
     />
   );
 }
@@ -110,20 +108,34 @@ const handleSubmit = async (formData) => {
 // ─────────────────────────────────────────────────────────────
 function AppInner() {
   const { user } = useAuth();
+  const [view, setView] = useState('app'); // 'app', 'hr', or 'manager'
 
-  if (!user)                   return <LoginPage />;
-  return <UserApp />;
+  if (!user) return <LoginPage />;
+  
+  // HR user view switch
+  if (user.role === 'hr' && view === 'hr') {
+    return <HRDashboard onBack={() => setView('app')} />;
+  }
+
+  // Manager user view switch
+  if (user.role === 'manager' && view === 'manager') {
+    return <ManagerPage onBack={() => setView('app')} />;
+  }
+
+  return (
+    <UserApp 
+      onOpenHRDashboard={() => setView('hr')} 
+      onOpenManagerPanel={() => setView('manager')} 
+    />
+  );
 }
-
 // ─────────────────────────────────────────────────────────────
 //  Root Export
 // ─────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <TripReviewProvider>
-      <AuthProvider>
-        <AppInner />
-      </AuthProvider>
-    </TripReviewProvider>
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }

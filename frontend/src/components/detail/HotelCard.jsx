@@ -6,7 +6,7 @@ const FALLBACK_HOTEL = 'https://images.unsplash.com/photo-1566073771259-6a850609
 export default function HotelCard({ hotel, inPlan = false, onAdd }) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [checkIn, setCheckIn]         = useState('');
-  const [nights, setNights]           = useState(1);
+  const [checkOut, setCheckOut]       = useState('');
   const [amount, setAmount]           = useState(Math.round((hotel.price || 0) * 83));
 
   if (!hotel) return null;
@@ -15,6 +15,20 @@ export default function HotelCard({ hotel, inPlan = false, onAdd }) {
   const hotelMapUrl = hotel.lat && hotel.lng
     ? `https://www.google.com/maps/search/?api=1&query=${hotel.lat},${hotel.lng}`
     : null;
+
+  // Calculate nights
+  let nights = 0;
+  let dateError = '';
+  if (checkIn && checkOut) {
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffTime = end - start;
+    nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (nights <= 0) {
+      dateError = 'Check-out must be after check-in';
+      nights = 0;
+    }
+  }
 
   const formatDateLabel = (dateStr) => {
     if (!dateStr) return '';
@@ -27,22 +41,23 @@ export default function HotelCard({ hotel, inPlan = false, onAdd }) {
   const handleConfirm = (e) => {
     e.stopPropagation();
     if (!checkIn) { alert('Please select a check-in date'); return; }
-    onAdd({ ...hotel, checkIn, nights: Number(nights), price: Number(amount) });
+    if (!checkOut) { alert('Please select a check-out date'); return; }
+    if (nights <= 0) { alert('Check-out must be after check-in'); return; }
+    onAdd({ ...hotel, checkIn, checkOut, nights: Number(nights), price: Number(amount) });
     setIsSelecting(false);
   };
 
   return (
     <div 
       draggable="true"
-  onDragStart={(e) => {
-    e.dataTransfer.setData("itemData", JSON.stringify({ ...hotel, type: 'hotel' }));
-    e.dataTransfer.effectAllowed = "copy";
-  }}
- 
-    
-    className={`relative bg-white border rounded-xl transition-all ${
-      inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
-    }`} style={isSelecting ? { minHeight: '280px' } : {}}>
+      onDragStart={(e) => {
+        e.dataTransfer.setData("itemData", JSON.stringify({ ...hotel, type: 'hotel' }));
+        e.dataTransfer.effectAllowed = "copy";
+      }}
+      onClick={() => { if (!inPlan) setIsSelecting(true); }}
+      className={`relative bg-white border rounded-xl transition-all cursor-pointer ${
+        inPlan ? 'border-green-300 bg-green-50' : 'border-gray-100 hover:border-gold-200'
+      }`} style={isSelecting ? { minHeight: '320px' } : {}}>
 
       {/* Date Selection Overlay */}
       {isSelecting && (
@@ -64,12 +79,27 @@ export default function HotelCard({ hotel, inPlan = false, onAdd }) {
               )}
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase tracking-wider">Total Nights</label>
-              <input type="number" min="1"
+              <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase tracking-wider">Check-out Date</label>
+              <input type="date"
                 className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                value={nights}
-                onChange={(e) => setNights(e.target.value)} />
+                value={checkOut}
+                onChange={(e) => setCheckOut(e.target.value)} />
+              {checkOut && !dateError && (
+                <div className="text-[10px] text-gold-600 font-semibold mt-0.5">
+                  📅 {formatDateLabel(checkOut)}
+                </div>
+              )}
+              {dateError && (
+                <div className="text-[10px] text-red-500 font-semibold mt-0.5">
+                  {dateError}
+                </div>
+              )}
             </div>
+            {nights > 0 && !dateError && (
+              <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>
+                {nights} Night{nights > 1 ? 's' : ''}
+              </div>
+            )}
             <div>
               <label className="text-[10px] text-gray-400 block mb-0.5 font-semibold uppercase tracking-wider">Amount (₹/night)</label>
               <input type="number" min="0"
@@ -77,7 +107,7 @@ export default function HotelCard({ hotel, inPlan = false, onAdd }) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)} />
             </div>
-            {amount && (
+            {amount && nights > 0 && !dateError && (
               <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 text-[10px] text-gray-600">
                 🌙 {nights} night{nights > 1 ? 's' : ''} ×{' '}
                 <span className="font-bold">₹{parseFloat(amount).toLocaleString('en-IN')}</span>

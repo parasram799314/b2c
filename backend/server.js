@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import rfqRoutes from './routes/rfq.js';
 import flightRoutes from './routes/flights.js';
 import budgetApprovalRoutes from './routes/budgetApprovals.js';
+import userRoutes from './routes/users.js';
 
 dotenv.config();
 console.log('GOOGLE KEY:', process.env.GOOGLE_PLACES_API_KEY?.slice(0, 10));
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/users', userRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api', flightRoutes);
 

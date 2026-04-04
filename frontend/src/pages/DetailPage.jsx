@@ -10,41 +10,24 @@ import GenieChatButton from '../components/detail/GenieChatButton';
 import GroupChatBox from '../components/detail/headings/GroupChatBox';
 import OtherTab from '../components/detail/rightside/OtherTab';
 import ViewAttachmentsModal from '../components/detail/ViewAttachmentsModal';
+import TripDetailsModal from '../components/detail/headings/TripDetailsModal';
 import { Icons } from '../ui/icons';
-
+import PlanPanel, { BookView } from '../components/detail/PlanPanel';
+import PermissionAvatars from '../components/detail/headings/PermissionAvatars';
 import axios from 'axios'; // ✅ Ye line add karo
+import PlanCard, {
+  ShieldEmpty,
+  fmt,
+  fmtDate,
+  getResolvedDate,
+  getLogoUrl,
+  PTag,
+  PolicyShieldIcon,
+} from '../components/shared/PlanCard';
 
 
 
-// ─── Policy Shield Icons ───────────────────────────────────────────────────────
-const ShieldCheck = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L4 5.5V11C4 15.4 7.4 19.5 12 21C16.6 19.5 20 15.4 20 11V5.5L12 2Z"
-      stroke="#16a34a" strokeWidth="1.6" fill="#dcfce7" strokeLinejoin="round"/>
-    <polyline points="8.5,12 11,14.5 15.5,9.5" stroke="#16a34a" strokeWidth="1.6"
-      strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-const ShieldCross = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L4 5.5V11C4 15.4 7.4 19.5 12 21C16.6 19.5 20 15.4 20 11V5.5L12 2Z"
-      stroke="#dc2626" strokeWidth="1.6" fill="#fee2e2" strokeLinejoin="round"/>
-    <line x1="9" y1="9" x2="15" y2="15" stroke="#dc2626" strokeWidth="1.6" strokeLinecap="round"/>
-    <line x1="15" y1="9" x2="9" y2="15" stroke="#dc2626" strokeWidth="1.6" strokeLinecap="round"/>
-  </svg>
-);
-const ShieldEmpty = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L4 5.5V11C4 15.4 7.4 19.5 12 21C16.6 19.5 20 15.4 20 11V5.5L12 2Z"
-      stroke="#1a6fd4" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
-  </svg>
-);
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const WEGO = 'https://assets.wego.com/image/upload/h_240,c_fill,f_auto,fl_lossy,q_auto:best,g_auto/v20260217/flights/airlines_square/';
-const KIWI = 'https://images.kiwi.com/airlines/64/';
 
-
-// ─── CITIES (RFQForm se same) ────────────────────────────────
 const CITIES = [
   'Indore, India','Mumbai, India','Delhi, India','Bangalore, India',
   'Hyderabad, India','Chennai, India','Kolkata, India','Pune, India',
@@ -52,52 +35,6 @@ const CITIES = [
   'London, UK','Dubai, UAE','Singapore','New York, USA',
   'Paris, France','Tokyo, Japan',
 ];
-
-const getLogoUrl = (name = '') => {
-  const u = (name || '').trim().toUpperCase();
-  const n = (name || '').trim().toLowerCase();
-  const MAP = { AI:'AI', IX:'IX', '6E':'6E', SG:'SG', QP:'QP', UK:'UK', G8:'G8', EK:'EK', QR:'QR', EY:'EY', LH:'LH', BA:'BA', SQ:'SQ', TK:'TK' };
-  if (MAP[u]) return `${WEGO}${MAP[u]}.png`;
-  if (u === 'HR') return `${KIWI}HR.png`;
-  if (u === '9I') return `${KIWI}9I.png`;
-  if (n.includes('air india express')) return `${WEGO}IX.png`;
-  if (n.includes('air india'))  return `${WEGO}AI.png`;
-  if (n.includes('indigo'))     return `${WEGO}6E.png`;
-  if (n.includes('spicejet'))   return `${WEGO}SG.png`;
-  if (n.includes('akasa'))      return `${WEGO}QP.png`;
-  if (n.includes('vistara'))    return `${WEGO}UK.png`;
-  if (n.includes('emirates'))   return `${WEGO}EK.png`;
-  if (n.includes('qatar'))      return `${WEGO}QR.png`;
-  if (/^[A-Z0-9]{2,3}$/.test(u)) return `${WEGO}${u}.png`;
-  return null;
-};
-
-const fmt     = (n) => `Rs.${Math.round(Number(n)).toLocaleString('en-IN')}`;
-const fmtDate = (d) => {
-  if (!d) return '';
-  try {
-    const dt = new Date(d + (d.includes('T') ? '' : 'T00:00:00'));
-    return dt.toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-  } catch { return d; }
-};
-
-const getResolvedDate = (item) => {
-  let d = '';
-  if (item.type === 'flight')     d = item.depDate    || item.date || '';
-  if (item.type === 'hotel')      d = item.checkIn    || item.date || '';
-  if (item.type === 'transfer')  d = item.pickupDate || item.date || '';
-  if (item.type === 'restaurant') d = item.visitDate  || item.date || '';
-  if (item.type === 'attraction') d = item.date || ''; 
-
-
-  if (item.type === 'other')      d = item.date || '';
-  if (!d && item.id) {
-    const parts = item.id.split('_');
-    const last  = parts[parts.length - 1];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(last)) d = last;
-  }
-  return d;
-};
 
 // ─── getItemDestination ───────────────────────────────────────────────────────
 function getItemDestination(item, destNames) {
@@ -123,126 +60,6 @@ function getItemDestination(item, destNames) {
 
   return null;
 }
-
-// ─── PermissionAvatars ────────────────────────────────────────────────────────
-const DUMMY_USERS = [
-  { initial: 'T', name: 'Trushant Shah', permission: 'Admin',    permBg: '#ede9fe', permColor: '#5b21b6', avatarBg: '#8b5cf6' },
-  { initial: 'R', name: 'Rahul Mehta',   permission: 'Can Edit', permBg: '#dbeafe', permColor: '#1e40af', avatarBg: '#0ea5e9' },
-  { initial: 'P', name: 'Priya Nair',    permission: 'View Only',permBg: '#d1fae5', permColor: '#065f46', avatarBg: '#f59e0b' },
-];
-
-function PermissionAvatars() {
-  const [openIdx, setOpenIdx] = useState(null);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpenIdx(null); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div ref={ref} style={{ display:'flex', alignItems:'center' }}>
-      {DUMMY_USERS.map((u, i) => (
-        <div
-          key={i}
-          style={{ position:'relative', zIndex: DUMMY_USERS.length - i }}
-          onMouseEnter={() => setOpenIdx(i)}
-          onMouseLeave={() => setOpenIdx(null)}
-          onClick={() => setOpenIdx(openIdx === i ? null : i)}
-        >
-          <div style={{
-            width:'26px', height:'26px', borderRadius:'50%',
-            background: u.avatarBg, color:'#fff',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:'10px', fontWeight:700,
-            border:'2px solid #fff',
-            marginRight: i < DUMMY_USERS.length - 1 ? '-6px' : '0',
-            cursor:'pointer',
-            transition:'transform 0.15s',
-            transform: openIdx === i ? 'scale(1.18)' : 'scale(1)',
-            boxShadow: openIdx === i ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-            userSelect: 'none',
-          }}>
-            {u.initial}
-          </div>
-          {openIdx === i && (
-            <div style={{
-              position:'absolute', top:'32px', left:'50%', transform:'translateX(-50%)',
-              background:'#1f2937', color:'#fff',
-              borderRadius:'9px', padding:'8px 11px',
-              fontSize:'11px', whiteSpace:'nowrap',
-              zIndex:9999, pointerEvents:'none',
-              boxShadow:'0 4px 16px rgba(0,0,0,0.22)',
-            }}>
-              <div style={{
-                position:'absolute', top:'-5px', left:'50%', transform:'translateX(-50%)',
-                width:0, height:0,
-                borderLeft:'5px solid transparent', borderRight:'5px solid transparent',
-                borderBottom:'5px solid #1f2937',
-              }} />
-              <div style={{ fontWeight:700, fontSize:'11px', marginBottom:'5px', color:'#f9fafb' }}>{u.name}</div>
-              <span style={{
-                fontSize:'10px', fontWeight:600,
-                background: u.permBg, color: u.permColor,
-                padding:'2px 8px', borderRadius:'4px',
-                display:'inline-block',
-              }}>
-                {u.permission}
-              </span>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-// ─── PolicyShieldIcon ──────────────────────────────────────────────────────────
-function PolicyShieldIcon({ underPolicy = true }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {underPolicy ? <ShieldCheck size={18} /> : <ShieldCross size={18} />}
-      {hovered && (
-        <div style={{
-          
-          position: 'absolute', top: '24px', right: '50%',
-transform: 'translateX(50%)',
-          background: underPolicy ? '#15803d' : '#b91c1c',
-          color: '#fff', fontSize: '11px', fontWeight: 600,
-          padding: '4px 10px', borderRadius: '6px',
-          whiteSpace: 'nowrap', zIndex: 9999, pointerEvents: 'none',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-        }}>
-          {underPolicy ? 'Item is under policy' : 'Item is not under policy'}
-          <div style={{
-            position: 'absolute', bottom: '-4px', left: '50%',
-            transform: 'translateX(-50%)', width: 0, height: 0,
-            borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
-         borderBottom: `5px solid ${underPolicy ? '#15803d' : '#b91c1c'}`,
-borderTop: 'none',
-bottom: 'auto',
-top: '-5px',
-          }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── PTag ─────────────────────────────────────────────────────────────────────
-function PTag({ bg, color, children }) {
-  return (
-    <span style={{ fontSize:'10px', fontWeight:600, padding:'2px 7px', borderRadius:'6px', background:bg||'#f3f4f6', color:color||'#374151', display:'inline-block' }}>
-      {children}
-    </span>
-  );
-}
-
 // ─── SectionDivider ───────────────────────────────────────────────────────────
 function SectionDivider({ label }) {
   return (
@@ -253,7 +70,6 @@ function SectionDivider({ label }) {
     </div>
   );
 }
-
 // ─── BudgetToast ──────────────────────────────────────────────────────────────
 function BudgetToast({ grandTotal, budget, onClose }) {
   const budgetNum = parseFloat(budget || 0);
@@ -282,7 +98,6 @@ function BudgetToast({ grandTotal, budget, onClose }) {
     </div>
   );
 }
-
 // ─── TpProfilePopup ───────────────────────────────────────────────────────────
 function TpProfilePopup({ profile, onSave, onClose }) {
   const [form, setForm] = useState({ ...profile });
@@ -328,436 +143,7 @@ function TpProfilePopup({ profile, onSave, onClose }) {
     </div>
   );
 }
-
-// ─── ItemDetailModal ──────────────────────────────────────────────────────────
-function ItemDetailModal({ item, onClose }) {
-  const [imgErr,     setImgErr]     = useState(false);
-  const logoSrc      = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
-  const hotelImg     = item.type === 'hotel'  ? (item.image || item.imageUrl || item.photo || null) : null;
-  const resolvedDate = getResolvedDate(item);
-
-  return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:'18px', width:'100%', maxWidth:'420px', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.2)', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ background:'rgb(247,190,57)', padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-          <span style={{ fontWeight:700, fontSize:'14px', color:'#1a1a1a' }}>
-            {item.type === 'flight' ? 'Flight Details' : item.type === 'hotel' ? 'Hotel Details' : item.type === 'attraction' ? 'Attraction' : item.type === 'other' ? 'Activity' : 'Transfer'}
-          </span>
-          <button onClick={onClose} style={{ width:'26px', height:'26px', borderRadius:'50%', background:'rgba(0,0,0,0.12)', border:'none', cursor:'pointer', fontSize:'13px', color:'#1a1a1a' }}>x</button>
-        </div>
-
-        <div style={{ padding:'18px', overflowY:'auto', flex:1 }}>
-          <div style={{ marginBottom:'12px' }}>
-            {item.status === 'paid'      && <span style={{ fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'20px', background:'#dcfce7', color:'#16a34a' }}>Paid</span>}
-            {item.status === 'cancelled' && <span style={{ fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'20px', background:'#fee2e2', color:'#dc2626' }}>Cancelled</span>}
-            {(!item.status || item.status === 'pending') && <span style={{ fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'20px', background:'#fef3c7', color:'#92400e' }}>Pending</span>}
-          </div>
-
-          {item.type === 'flight' && (
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px' }}>
-                <div style={{ width:'48px', height:'48px', borderRadius:'12px', background:'#fff5f0', border:'1px solid #ffe4d6', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  {logoSrc && !imgErr ? <img src={logoSrc} alt={item.airline} style={{ width:'100%', height:'100%', objectFit:'contain' }} onError={() => setImgErr(true)} /> : <span style={{ fontSize:'22px' }}>plane</span>}
-                </div>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:'15px', color:'#111827' }}>{item.airline}</div>
-                  <div style={{ fontSize:'12px', color:'#9ca3af' }}>{item.flightNumber}</div>
-                </div>
-              </div>
-              <div style={{ background:'#f9fafb', borderRadius:'12px', padding:'16px', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px' }}>
-                <div>
-                  <div style={{ fontSize:'10px', color:'#9ca3af', marginBottom:'2px' }}>Departure</div>
-                  <div style={{ fontSize:'22px', fontWeight:800, color:'#111' }}>{item.depTime || item.departureTime || '-'}</div>
-                  <div style={{ fontSize:'13px', fontWeight:600, color:'#374151' }}>{item.fromAirport || item.from || '-'}</div>
-                </div>
-                <div style={{ textAlign:'center' }}>
-                  <div style={{ fontSize:'11px', color:'#6b7280' }}>{item.duration}</div>
-                  <div style={{ fontSize:'10px', fontWeight:700, color:'#16a34a', marginTop:'4px' }}>
-                    {Number(item.stops) === 0 ? 'Non-stop' : `${item.stops} Stop${item.stops > 1 ? 's' : ''}`}
-                  </div>
-                </div>
-                <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:'10px', color:'#9ca3af', marginBottom:'2px' }}>Arrival</div>
-                  <div style={{ fontSize:'22px', fontWeight:800, color:'#111' }}>
-                    {item.arrTime || item.arrivalTime || '-'}
-                    {item.nextDay && <sup style={{ fontSize:'10px', color:'rgb(247,190,57)' }}>+1</sup>}
-                  </div>
-                  <div style={{ fontSize:'13px', fontWeight:600, color:'#374151' }}>{item.toAirport || item.to || '-'}</div>
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                {resolvedDate && <PTag bg="#fef3c7" color="#92400e">{fmtDate(resolvedDate)}</PTag>}
-                {item.price   && <PTag bg="#fef9c3" color="#713f12">{fmt(item.price)}</PTag>}
-                <PTag bg="#f3f4f6" color="#374151">{item.baggage?.iB || '15 Kg'} / {item.baggage?.cB || '7 Kg'}</PTag>
-              </div>
-            </div>
-          )}
-
-          {item.type === 'hotel' && (
-            <div>
-              {hotelImg && <img src={hotelImg} alt={item.hotelName || item.name} style={{ width:'100%', height:'160px', objectFit:'cover', borderRadius:'10px', marginBottom:'14px' }} onError={e => { e.target.style.display = 'none'; }} />}
-              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'4px' }}>{item.hotelName || item.name || 'Hotel'}</div>
-              {item.stars && <div style={{ marginBottom:'6px' }}>{'*'.repeat(Math.min(Number(item.stars), 5))}</div>}
-              {(item.address || item.cityName) && <div style={{ fontSize:'12px', color:'#6b7280', marginBottom:'12px' }}>{item.address || item.cityName}</div>}
-              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                {item.checkIn && <PTag bg="#fef3c7" color="#92400e">Check-in: {fmtDate(item.checkIn)}</PTag>}
-                {item.nights  && <PTag bg="#dbeafe" color="#1e40af">{item.nights} Night{Number(item.nights) > 1 ? 's' : ''}</PTag>}
-                {item.rating  && <PTag bg="#dcfce7" color="#166534">{item.rating}</PTag>}
-                {item.price   && <PTag bg="#fef9c3" color="#713f12">{fmt(parseFloat(item.price) * (Number(item.nights) || 1))}</PTag>}
-              </div>
-            </div>
-          )}
-
-          {item.type === 'attraction' && (
-            <div>
-              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'8px' }}>{item.name || 'Attraction'}</div>
-              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                {item.category && <PTag bg="#f3f4f6" color="#374151">{item.category}</PTag>}
-                {item.rating   && <PTag bg="#dcfce7" color="#166534">{item.rating}</PTag>}
-                {item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
-              </div>
-            </div>
-          )}
-
-          {item.type === 'transfer' && (
-            <div>
-              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'4px' }}>{item.provider || item.id || 'Transfer'}</div>
-              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'8px' }}>
-                {item.from && item.to && <PTag bg="#f3f4f6" color="#374151">{item.from} to {item.to}</PTag>}
-                {item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
-                {item.price    && <PTag bg="#fef9c3" color="#713f12">{item.price}</PTag>}
-              </div>
-            </div>
-          )}
-
-          {item.type === 'other' && (
-            <div>
-              <div style={{ fontWeight:700, fontSize:'15px', color:'#111827', marginBottom:'8px' }}>{item.name || item.activity || 'Activity'}</div>
-              <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                {item.date     && <PTag bg="#fef3c7" color="#92400e">{fmtDate(item.date)}</PTag>}
-                {item.duration && <PTag bg="#dbeafe" color="#1e40af">{item.duration}</PTag>}
-                {item.price    && <PTag bg="#fef9c3" color="#713f12">{fmt(item.price)}</PTag>}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── PlanCard ──────────────────────────────────────────────────────────────────
-function PlanCard({ item, onRemove, itemIndex, onReorder, readOnlyPlan = false, onUpdateItem }) {
-  const [imgErr, setImgErr] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const [noteText, setNoteText] = useState(item.userNote || item.note || '');
-  const [attachments, setAttachments] = useState(item.attachments || []);
-
-  const status = item.status || 'pending';
-  const resolvedDate = getResolvedDate(item);
-  const titleText = item.type === 'flight' ? `${item.fromAirport || item.from || ''} to ${item.toAirport || item.to || ''}` : item.hotelName || item.name || item.type;
-  const logoSrc = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
-
-  const borderStyle = readOnlyPlan
-    ? { borderColor: '#86efac', background: '#f0fdf4' }
-    : status === 'paid'
-    ? { borderColor: '#86efac', background: '#f0fdf4' }
-    : (item.type === 'other' && status === 'pending')
-      ? { borderColor: '#fde68a', background: '#fffdf5' }
-      : { borderColor: '#e5e7eb', background: '#fff' };
-
-  const TrashIcon = () => (
-    <svg width="14" height="15" viewBox="0 0 11 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1 3H10M4 3V2H7V3M2 3L2.5 10.5C2.5 10.8 2.7 11 3 11H8C8.3 11 8.5 10.8 8.5 10.5L9 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4.5 5.5V8.5M6.5 5.5V8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-
-  const renderFlightContent = () => (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <div style={{ width: '48px', height: '48px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '1px solid #f1f5f9', background: '#fff' }}>
-          {logoSrc && !imgErr ? <img src={logoSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImgErr(true)} /> : <span style={{ fontSize: '24px' }}>✈️</span>}
-        </div>
-        <div style={{ minWidth: '80px' }}>
-          <div style={{ fontSize: '15px', color: '#1a1a1a', fontWeight: 800 }}>{item.airline || 'AI'}</div>
-          <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{item.flightNumber || 'AI2592'}</div>
-        </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 900 }}>{item.depTime || '16:40'}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{item.from || 'IDR'}</div>
-          </div>
-          <div style={{ flex: 1, textAlign: 'center', minWidth: '80px', position: 'relative' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{item.duration || '10h 10m'}</div>
-            <div style={{ height: '1.5px', background: '#e2e8f0', width: '100%', position: 'relative' }}>
-              
-            </div>
-            <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800 }}>{item.stops === 0 ? 'Non-stop' : `${item.stops || 2} Stops`}</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: 900 }}>{item.arrTime || '01:20'}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{item.to || 'DXB'}</div>
-          </div>
-        </div>
-       <div style={{ textAlign: 'right', minWidth: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-  {/* 1. Status aur Delete Icon ab upar aayenge */}
-  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '8px' }}>
-    {readOnlyPlan && (
-      <span style={{ fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '20px', background: '#166534', color: '#fff', textTransform: 'uppercase' }}>
-        Approved
-      </span>
-    )}
-     {/* ✅ POLICY SHIELD — Pending badge ke bilkul left me */}
-    <PolicyShieldIcon underPolicy={item.id?.charCodeAt(0) % 2 === 0} />
-    <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
-      {item.type === 'other' ? (status === 'paid' ? 'PAID' : 'UNPAID') : status}
-    </span>
-    
-    {!readOnlyPlan && status !== 'paid' && (
-      <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <TrashIcon />
-      </button>
-    )}
-  </div>
-
-  {/* 2. Price ab niche aayega */}
-  <div style={{ fontSize: '15px', fontWeight: 900, color: '#111827' }}>
-  {fmt(item.price || 0)}
-</div>
-</div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div
-      draggable={!readOnlyPlan && status !== 'paid'} // Paid item move nahi hona chahiye (Optional)
-      onDragStart={(e) => {
-        setIsDragging(true);
-        e.dataTransfer.setData('planReorderIdx', String(itemIndex));
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragEnd={() => setIsDragging(false)}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault(); e.stopPropagation(); setIsDragOver(false);
-        const fromIdx = parseInt(e.dataTransfer.getData('planReorderIdx'));
-        if (!isNaN(fromIdx) && fromIdx !== itemIndex) onReorder(fromIdx, itemIndex);
-      }}
-      style={{ position: 'relative', marginBottom: '16px', opacity: isDragging ? 0.5 : 1, outline: isDragOver ? '2px dashed #F5A623' : 'none', borderRadius: '16px', cursor: readOnlyPlan || status === 'paid' ? 'default' : 'grab' }}
-    >
-      {item.type === 'other' && (
-        <span style={{ position: 'absolute', top: '-9px', right: '12px', zIndex: 5, fontSize: '8px', fontWeight: 900, padding: '2px 10px', borderRadius: '4px', background: 'rgb(247,190,57)', color: '#1a1a1a', border: '1.5px solid #f59e0b', letterSpacing: '0.08em', textTransform: 'uppercase', boxShadow: '0 2px 6px rgba(247,190,57,0.45)', whiteSpace: 'nowrap' }}>⚡ External</span>
-      )}
-
-      {showDetail && <ItemDetailModal item={item} onClose={() => setShowDetail(false)} />}
-
-      <div style={{ border: '1.5px solid', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', ...borderStyle, overflow: 'hidden' }}>
-     <div style={{ padding: '10px 14px' }} onClick={() => setShowDetail(true)}>
-  {item.type === 'flight' ? renderFlightContent() : (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px' }}>
-      
-      {/* 1. Left: Icon Box — SAME SIZE as flight logo box (48x48) */}
-      <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-       {item.type === 'hotel' ? '🏨' : item.type === 'attraction' ? '🗺️' : item.type === 'transfer' ? '🚗' : '📌'}
-      </div>
-
-      {/* 2. Center: Info */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <span style={{ fontSize: '13px', fontWeight: 800, color: '#111827', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {titleText}
-        </span>
-        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {item.address || item.cityName || item.destination}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-          {resolvedDate && <PTag bg="#f1f5f9" color="#475569">{fmtDate(resolvedDate)}</PTag>}
-          {(item.startTime || item.endTime) && <PTag bg="#f0f9ff" color="#0369a1">🕒 {item.startTime || ''} {item.endTime ? `- ${item.endTime}` : ''}</PTag>}
-          {item.referenceId && <PTag bg="#f3f4f6" color="#6b7280">Ref: {item.referenceId}</PTag>}
-        </div>
-      </div>
-
-      {/* 3. Right: Status + Price — SAME as flight */}
-      <div style={{ textAlign: 'right', minWidth: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-          {readOnlyPlan && (
-            <span style={{ fontSize: '8px', fontWeight: 900, padding: '2px 8px', borderRadius: '20px', background: '#166534', color: '#fff', textTransform: 'uppercase' }}>Approved</span>
-          )}
-            <PolicyShieldIcon underPolicy={item.id?.charCodeAt(0) % 2 === 0} />
-          <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
-            {status === 'paid' ? 'PAID' : 'PENDING'}
-          </span>
-          {!readOnlyPlan && status !== 'paid' && (
-            <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrashIcon />
-            </button>
-          )}
-        </div>
-   <div style={{ fontSize: '15px', fontWeight: 900, color: '#111827' }}>
-  {item.price ? fmt(item.price) : ''}
-</div>
-      </div>
-    </div>
-  )}
-</div>
-
-        <div onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }} style={{ background: '#f8fafc', padding: '5px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '13px', color: noteText ? '#334155' : '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{noteText || "Add notes"}</div>
-          <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#e2e8f0' }}>|</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>Attachment({attachments.length})</div>
-        </div>
-      </div>
-
-      {showNotes && (
-        <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px', zIndex: 10, position: 'relative' }}>
-          <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Type notes here..." rows={3} style={{ width: '100%', fontSize: '13px', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
-          <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, cursor: 'pointer', background: '#fff', border: '1px solid #e5e7eb', padding: '8px 14px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>📎 Attach File <input type="file" multiple style={{ display: 'none' }} onChange={e => { const files = Array.from(e.target.files).map(f => ({ name: f.name })); setAttachments(prev => [...prev, ...files]); }} /></label>
-            <button onClick={() => {
-  setShowNotes(false);
-  // ✅ Parent ko updated note aur attachments bhejo
-  if (onUpdateItem) onUpdateItem(item.id, { userNote: noteText, attachments });
-}} style={{ flex: 1, background: 'rgb(247,190,57)', border: 'none', borderRadius: '10px', fontWeight: 900, color: '#1a1a1a' }}>
-  Save Notes
-</button>
-               </div>
-        </div>
-      )}
-    </div>
-  );
-}
 // ─── BookView ──────────────────────────────────────────────────────────────────
-function BookView({ planItems, onClose, onPay, viewMode, setViewMode }) {
-  // Sirf pending items filter karein
-  const pendingItems = planItems.filter(p => p.status !== 'paid' && p.status !== 'cancelled');
-  
-  // Selection state: Shuruat mein sab selected honge
-  const [selectedIds, setSelectedIds] = useState(pendingItems.map(p => p.id));
-
-  const toggleItem = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  const isAllSelected = selectedIds.length === pendingItems.length && pendingItems.length > 0;
-
-  const handleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedIds([]); // Sab uncheck kar do
-    } else {
-      setSelectedIds(pendingItems.map(p => p.id)); // Sab check kar do
-    }
-  };
-
-  const handlePay = () => { 
-    if (selectedIds.length === 0) return;
-    onPay(selectedIds); 
-    onClose(); 
-  };
-
-  // Grouping logic (Day-wise ya Item-wise)
-  const byDate = {};
-  pendingItems.forEach(item => {
-    const d = getResolvedDate(item);
-    const dk = d ? fmtDate(d) : 'No Date';
-    if (!byDate[dk]) byDate[dk] = [];
-    byDate[dk].push(item);
-  });
-
-  const renderItem = (item) => {
-    const isChecked = selectedIds.includes(item.id);
-    const title = item.type === 'flight' ? `${item.from || ''} to ${item.to || ''}` : item.hotelName || item.name || item.type;
-    const logoSrc = item.type === 'flight' ? (item.logo || getLogoUrl(item.airline || '')) : null;
-
-    return (
-      <div 
-        key={item.id} 
-        onClick={() => toggleItem(item.id)}
-        style={{ 
-          border: '1px solid', borderRadius: '12px', padding: '12px', marginBottom: '10px', 
-          display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
-          borderColor: isChecked ? 'rgb(247,190,57)' : '#e5e7eb',
-          background: isChecked ? '#fffdf5' : '#fff'
-        }}
-      >
-        <input 
-          type="checkbox" 
-          checked={isChecked} 
-          onChange={() => {}} // Click div par handle ho raha hai
-          style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)', cursor: 'pointer' }} 
-        />
-        
-        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          {item.type === 'flight' && logoSrc ? <img src={logoSrc} style={{ width: '100%', objectFit: 'contain' }} /> : <span>{item.type === 'hotel' ? '🏨' : '📍'}</span>}
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{title}</div>
-          <div style={{ fontSize: '11px', color: '#64748b' }}>
-            {item.price ? fmt(item.price) : 'Price on request'} • {item.type.toUpperCase()}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-      {/* Header */}
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', padding: '5px 10px', cursor: 'pointer' }}>back</button>
-          <span style={{ fontSize: '14px', fontWeight: 900 }}>BOOK ALL ITEMS</span>
-        </div>
-        <div style={{ display: 'flex', background: '#f3f4f6', padding: '3px', borderRadius: '10px' }}>
-          {[{ v: 'daywise', l: 'Day-wise' }, { v: 'itemwise', l: 'Item-wise' }].map(opt => (
-            <button key={opt.v} onClick={() => setViewMode(opt.v)} style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer', background: viewMode === opt.v ? '#fff' : 'transparent', color: viewMode === opt.v ? '#111827' : '#6b7280' }}>{opt.l}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Select All Toolbar */}
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#374151' }}>
-          <input 
-            type="checkbox" 
-            checked={isAllSelected} 
-            onChange={handleSelectAll} 
-            style={{ width: '18px', height: '18px', accentColor: 'rgb(247,190,57)' }} 
-          />
-          Select All ({pendingItems.length})
-        </label>
-        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{selectedIds.length} items selected</span>
-      </div>
-
-      {/* List Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '15px 20px' }}>
-        {Object.entries(byDate).map(([dateLabel, items]) => (
-          <div key={dateLabel}>
-            <SectionDivider label={dateLabel} />
-            {items.map(renderItem)}
-          </div>
-        ))}
-      </div>
-
-      {/* Footer */}
-      <div style={{ padding: '16px 20px', borderTop: '1px solid #f3f4f6', background: '#fff' }}>
-        <button 
-          onClick={handlePay} 
-          disabled={selectedIds.length === 0}
-          style={{ width: '100%', padding: '14px', background: selectedIds.length > 0 ? 'rgb(247,190,57)' : '#e5e7eb', color: '#1a1a1a', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 900, cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed', marginBottom: '10px' }}
-        >
-          Pay for {selectedIds.length} Item{selectedIds.length !== 1 ? 's' : ''}
-        </button>
-        <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '13px', color: '#6b7280', cursor: 'pointer' }}>Back to plan</button>
-      </div>
-    </div>
-  );
-}
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 function TabHeader({ title, subtitle }) {
@@ -938,7 +324,6 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
       }]);
     }
   };
-
   const combinedDestData = [...allDestData, ...extraDestData];
   const allCombinedNames = combinedDestData.map(dd => dd.destination).filter(Boolean);
 
@@ -976,10 +361,6 @@ function FilteredView({ filter, rfq, allDestData, onAddToPlan, planItems, planId
       </div>
     );
   }
-
- 
- 
-
   if (filter === 'attractions') {
     const has = filteredDestData.some(dd => dd.attractions?.length > 0);
     return (
@@ -1126,25 +507,34 @@ const [itemFilter, setItemFilter] = useState('');
 
   const unmatchedItems = planItems.filter(item => !getItemDestination(item, destNames));
   // ─── Fixed Day Calculation Logic ───
-
-  // ─── Fixed Day Calculation Logic ───
+// ─── Fixed Day Calculation Logic ───
 const dayGroupsMap = {};
+
 planItems.forEach(item => {
-  const d = getResolvedDate(item);
+  // Fix: Hotel ke liye hamesha checkIn date hi base date honi chahiye
+  let d = getResolvedDate(item);
+  if (item.type === 'hotel' && item.checkIn) {
+    d = item.checkIn; 
+  }
   
-  // ✅ Hotel ke liye multiple days generate karo
+  if (!d) d = 'No Date';
+
+  // ✅ Hotel ke liye multiple days generate karo (Nights logic)
   if (item.type === 'hotel' && item.nights && Number(item.nights) > 1) {
     const nights = Number(item.nights);
     for (let n = 0; n < nights; n++) {
       const baseDate = new Date(d + 'T00:00:00');
       baseDate.setDate(baseDate.getDate() + n);
-      const dk = baseDate.toISOString().slice(0, 10);
+      const dk = `${baseDate.getFullYear()}-${String(baseDate.getMonth()+1).padStart(2,'0')}-${String(baseDate.getDate()).padStart(2,'0')}`;
+
+      
       if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
+      
       if (n === 0) {
-        // ✅ Pehle din: full PlanCard dikhao (night badge ke saath)
+        // Pehle din full card
         dayGroupsMap[dk].push({ ...item, _totalNights: nights });
       } else {
-        // ✅ Agle din: sirf ek chhoti strip (no PlanCard, no delete button)
+        // Agle dinon ke liye sirf continuation marker
         dayGroupsMap[dk].push({
           ...item,
           id: `${item.id}_night_${n}`,
@@ -1157,12 +547,11 @@ planItems.forEach(item => {
       }
     }
   } else {
-    const dk = d ? d : 'No Date';
-if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
-dayGroupsMap[dk].push(item);
+    // Baaki sab items (Flights, Attractions) ke liye normal grouping
+    if (!dayGroupsMap[d]) dayGroupsMap[d] = [];
+    dayGroupsMap[d].push(item);
   }
 });
-
   const sortedDayEntries = Object.entries(dayGroupsMap).sort(([a], [b]) => {
     if (a === 'No Date') return 1;
     if (b === 'No Date') return -1;
@@ -1177,16 +566,27 @@ dayGroupsMap[dk].push(item);
 
 const earliestItemDate = planDates.length > 0 ? planDates[0] : null;
 
-// अगर प्लान में आइटम है, तो उसकी तारीख को "Day 1" का बेसलाइन मानें, 
-// वरना फॉर्म की startDate को यूज करें।
 const baseDateStr = earliestItemDate || startDate;
 const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
  
 
+  const isAllCollapsed = sortedDayEntries.length > 0 && sortedDayEntries.every(([rawDate]) => collapsedDays[rawDate]);
+  const isAnyExpanded = sortedDayEntries.length > 0 && sortedDayEntries.some(([rawDate]) => !collapsedDays[rawDate]);
+
+  const handleToggleAll = () => {
+    if (isAnyExpanded) {
+      // Collapse All
+      const newCollapsed = {};
+      sortedDayEntries.forEach(([rawDate]) => { newCollapsed[rawDate] = true; });
+      setCollapsedDays(newCollapsed);
+    } else {
+      // Expand All
+      setCollapsedDays({});
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
-
-
       {/* ── Sticky Header (Updated to 5 Icons Style) ── */}
 <div style={{
   padding: '8px 16px',
@@ -1201,8 +601,17 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
   top: 0,
   zIndex: 10,
 }}>
-  {/* LEFT: Title + Badge + Item counts — sab ek row mein */}
+  {/* LEFT: Notification Bell + Shield + Title + Badge + Item counts — sab ek row mein */}
   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+     
+
+      {/* Shield + Policy Link */}
+  
+    </div>
+
+    <span style={{ color: '#e5e7eb' }}>|</span>
+
     <h2 style={{ fontSize: '15px', fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
       Trip Summary
     </h2>
@@ -1223,7 +632,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
       </Fragment>
     ))}
   </div>
-
   {/* RIGHT: Attachments + Download + Toggle */}
   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
     <button onClick={onViewAttachments} style={{
@@ -1237,7 +645,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
       </svg>
       View Attachments
     </button>
-
     <button style={{
       width: '28px', height: '28px', borderRadius: '8px', background: '#fff',
       border: '1.5px solid #e5e7eb', cursor: 'pointer',
@@ -1270,13 +677,12 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
   </div>
 </div>
 {/* ── Item-wise Filter Tabs (sirf itemwise mode mein dikhao) ── */}
-  
       {/* ── Scrollable Timeline Body ── */}
       <div 
        onDragOver={handleDragOver}   // <--- Add this
         onDragLeave={handleDragLeave} // <--- Add this
         onDrop={handleDrop} 
-        style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fff' }}>
+        style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fff', display: 'flex', flexDirection: 'column' }}>
 
        {planItems.length === 0 ? (
           /* Empty State */
@@ -1288,12 +694,34 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
             </p>
           </div>
         ) : viewMode === 'daywise' ? (
-
           /* ══ NAYA DAY-WISE VIEW (Image 1 & 2 Style) ══ */
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+            {/* Expand / Collapse All Toggle */}
+            <button
+              onClick={handleToggleAll}
+              style={{
+                fontSize: '11px', fontWeight: 700,
+                background: '#fff', border: '1px solid #e5e7eb',
+                borderRadius: '8px', padding: '5px 12px',
+                cursor: 'pointer', color: '#374151',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                alignSelf: 'flex-end', marginBottom: '10px',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            >
+              {isAnyExpanded ? 'Collapse All ↑' : 'Expand All ↓'}
+            </button>
     {sortedDayEntries.map(([rawDate, items], gi) => {
       const isCollapsed = collapsedDays[rawDate];
-      let currentDayNum = gi + 1;
+      let currentDayNum = gi + 1; // default fallback
+if (rawDate !== 'No Date' && tripBaseline) {
+  const diff = Math.round(
+    (new Date(rawDate + 'T00:00:00') - tripBaseline) / (1000 * 60 * 60 * 24)
+  );
+  currentDayNum = diff + 1;
+}
       const dayCity = getItemDestination(items[0], destNames) || "Destination";
       return (
         <div key={rawDate} style={{ marginBottom: '12px', background: '#fff', borderRadius: '12px', border: '1.5px solid #e5e7eb', overflow: 'hidden' }}>
@@ -1311,6 +739,7 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
 }}>
     DAY {currentDayNum}
 </span>
+
                 <div>
                 <span style={{ fontSize: '14px', fontWeight: 700 }}>Day {currentDayNum} - {dayCity}</span>
                 <div style={{ fontSize: '11px', color: '#9ca3af' }}>{rawDate === 'No Date' ? 'Unscheduled' : fmtDate(rawDate)}</div>
@@ -1337,8 +766,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
     })}
   </div>
 ) : (
-
-   
    /* ══ ITEM-WISE VIEW — Type-wise grouped, Day-wise UI style ══ */
           <div style={{ position: 'relative' }}>
             {(() => {
@@ -1353,7 +780,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
               return TYPE_CONFIG.map(({ type, label, icon }) => {
              const items = planItems.filter(i => i.type === type && (itemFilter === '' || itemFilter === type));
                 if (!items.length) return null;
-
                 return (
                   <div key={type} style={{
                     marginBottom: '20px',
@@ -1395,6 +821,7 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
                           onReorder={reorderPlan}
                           readOnlyPlan={readOnlyPlan}
                           onUpdateItem={onUpdateItem}
+                          showCheckOut={true}
                         />
                       ))}
                     </div>
@@ -1404,18 +831,7 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
             })()}
           </div>
         )}
-          
-        
-         
-        
-        
       </div>
-
-      {/* ── Sticky Footer ── */}
-     {/* ── Sticky Footer (Fixed & Centered) ── */}
-    {/* ── Sticky Footer ── */}
-     {/* ── Sticky Footer (Fixed & Centered) ── */}
-    {/* ── Sticky Footer (Single Compact Row) ── */}
       {/* ── Sticky Footer (Single Compact Row) ── */}
       {planItems.length > 0 && (
         <div style={{
@@ -1450,7 +866,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
           >
             {readOnlyPlan ? 'Book (locked)' : 'BOOK NOW'}
           </button>
-
           {/* 2. Trip Review Button — MIDDLE */}
           <button
             type="button"
@@ -1480,7 +895,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
                     ? '↩️ Re-send trip review'
                     : '📤 Send trip to manager review'}
           </button>
-
           {/* 3. Estimated Total — RIGHT */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
             <span style={{ fontSize: '9px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1495,7 +909,6 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
     </div> // Main div closing
   );
 }
-
 // ─── ResizerHandle (Isse hamesha component ke bahar rakho) ───
 function ResizerHandle({ onMouseDown, visible = true }) {
   const [hovered, setHovered] = useState(false);
@@ -1529,7 +942,6 @@ function ResizerHandle({ onMouseDown, visible = true }) {
     </div>
   );
 }
-
 // ─── Main DetailPage ───────────────────────────────────────────────────────────
 export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialPlan = [] }) {
   const [rfq,           setRfq]           = useState(() => {
@@ -1565,12 +977,9 @@ const [tempTripName, setTempTripName] = useState(rfq.tripName || '');
       }
     }
   }, []);
-
   // ── Genie / Chat panel state ──
   const [chatOpen, setChatOpen] = useState(true);
   const [groupChatOpen, setGroupChatOpen] = useState(false);
-
-
   // ── Responsive layout (mobile/tablet vs desktop) ──
   const [viewportW, setViewportW] = useState(() =>
     (typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -1780,7 +1189,7 @@ const journeyCities = useMemo(() => {
 
   // 4. Main Title Construction
   const tripTitle = (rfq.tripName || "MY TRIP").toUpperCase();
-  const dynamicMainHeading = `${tripTitle}`;
+  
   const allDestData = rfq.destinationData?.length > 0
     ? rfq.destinationData
     : (rfq.destinations || []).map(dest => ({
@@ -1941,8 +1350,6 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
     (rfq?.rfqId && String(rfq.rfqId).trim()) ||
     (rfq?._id && String(rfq._id).replace(/: /g, '').trim()) ||
     '';
-
- 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
 
@@ -1961,7 +1368,6 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
         onToggle={() => setChatOpen(true)}
         unreadCount={0}
       />
-
       {/* Navbar */}
       <header className="w-full z-30 flex-shrink-0" style={{ backgroundColor:'rgb(247,190,57)' }}>
         <div className="px-4 py-1.5 flex items-center justify-between">
@@ -2014,7 +1420,6 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
       )}
     </div>
   )}
-
   <span style={{ 
     fontSize: '9px', fontWeight: 800,
     background: planFrozen ? '#dcfce7' : rfq.reviewStatus === 'sent' ? '#fef3c7' : rfq.reviewStatus === 'rejected' ? '#fee2e2' : '#f3f4f6',
@@ -2031,7 +1436,6 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
     </span>
   )}
 </div>
-
               {/* ID Badge + Visual Journey Route (Arrows ➔) */}
               <div className="flex items-center gap-2">
                 {displayTripId && (
@@ -2100,229 +1504,131 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
             </div>
           </div>
 
-          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginRight: '10px', borderRight: '1px solid #e5e7eb', paddingRight: '10px' }}>
-    
-    {/* ✅ View business trip policy - LEFT side, bada aur dark */}
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-      <ShieldEmpty size={15} />
-      <span style={{ fontSize: '12px', color: '#1e40af', textDecoration: 'underline', fontWeight: 700, letterSpacing: '0.01em' }}>
-        View business trip policy
-      </span>
-    </div>
+         <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
 
-    {/* Trip Budget - RIGHT side */}
-{/* Trip Budget — sirf tab dikhao jab approved NAHI hai */}
-{approvalStatus?.status !== 'approved' && (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRight: '1.5px solid #e5e7eb', paddingRight: '15px' }}>
-    <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-      Trip Budget :
-    </span>
-    <span style={{ fontSize: '14px', fontWeight: 800, color: '#111827', whiteSpace: 'nowrap' }}>
-      {activeBudget ? `₹${Number(activeBudget).toLocaleString('en-IN')}` : 'No Budget'}
-    </span>
-  </div>
-)}
-
-
-{/* Approved hone par sirf green badge */}
-{approvalStatus?.status === 'approved' && (
-  <div style={{ fontSize: '11px', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '4px 10px', borderRadius: '6px', border: '1px solid #86efac' }}>
-    ✅ Approved Budget: ₹{Number(approvalStatus.approvedBudget).toLocaleString('en-IN')}
-  </div>
-)}
-
-{approvalStatus?.status === 'rejected' && (
-  <div style={{ fontSize: '9px', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>
-    ❌ Rejected {approvalStatus.managerComment && `— ${approvalStatus.managerComment}`}
-  </div>
-)}
-{approvalStatus?.status === 'pending' && (
-  <div style={{ fontSize: '9px', fontWeight: 700, color: '#92400e', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>
-    ⏳ Pending
-  </div>
-)}
-  </div>
-   {/* 1. NAYA BUTTON: Send Budget Approval */}
-  <button 
-    type="button"
-    disabled={planFrozen || approvalLoading}
-    style={{
-      display: 'flex', alignItems: 'center', gap: '6px',
-      padding: '6px 12px', borderRadius: '8px', background: planFrozen ? '#f3f4f6' : '#fff',
-      border: '1.5px solid rgb(247,190,57)', cursor: planFrozen || approvalLoading ? 'not-allowed' : 'pointer',
-      fontSize: '10px', fontWeight: 800, color: planFrozen ? '#9ca3af' : 'rgb(180, 130, 0)',
-      textTransform: 'uppercase', letterSpacing: '0.02em',
-      transition: 'all 0.15s',
-      opacity: planFrozen ? 0.7 : 1,
-    }}
-    onMouseEnter={e => { if (!planFrozen) e.currentTarget.style.background = '#fffbeb'; }}
-    onMouseLeave={e => { if (!planFrozen) e.currentTarget.style.background = '#fff'; }}
-    onClick={async () => {
-  if (planFrozen || approvalLoading) return;
-  setApprovalLoading(true);
-  try {
-    await axios.post('/api/budget-approvals', {
-      tripId:           rfq._id,
-      rfqId:            (rfq.rfqId && String(rfq.rfqId).trim()) || '',
-      tripName:         rfq.tripName || 'My Trip',
-      requestedBy:      'user',
-      budget:           Number(activeBudget) || 0,
-      grandTotal:       grandTotal,
-      planItems:        planItems,
-      destinations:     rfq.destinations || [],
-      numberOfAdults:   rfq.numberOfAdults   || 1,
-      numberOfChildren: rfq.numberOfChildren || 0,
-      numberOfInfants:  rfq.numberOfInfants  || 0,
-    });
-    // Turant status fetch karo
-    const res = await axios.get(`/api/budget-approvals/${rfq._id}`);
-    if (res.data?.success) setApprovalStatus(res.data.data);
-  } catch (err) {
-    alert('Error sending approval: ' + (err.response?.data?.message || err.message));
-  } finally {
-    setApprovalLoading(false);
-  }
-}}
+  {/* Bell */}
+  <button
+    style={{ position:'relative', width:'28px', height:'28px', borderRadius:'8px', background:'#fff', border:'1px solid #e5e7eb', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+    title="Notifications"
   >
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
     </svg>
-  {approvalLoading
-  ? '⏳ Sending...'
-  : approvalStatus?.status === 'pending'
-    ? '⏳ Approval Pending'
-    : approvalStatus?.status === 'approved'
-      ? (() => {
-          const approved = Number(approvalStatus.approvedBudget) || 0;
-          const remaining = approved - grandTotal;
-          const isOver = remaining < 0;
-          return `${isOver ? '⚠️ Over ₹' : '✅ ₹'}${Math.abs(remaining).toLocaleString('en-IN')} ${isOver ? 'over' : 'left'}`;
-        })()
-      : approvalStatus?.status === 'rejected'
-        ? '🔄 Re-send Approval'
-        : '📤 Send Budget Approval'
-}
+    <span style={{ position:'absolute', top:'-3px', right:'-3px', width:'7px', height:'7px', borderRadius:'50%', background:'#ef4444', border:'2px solid #fff' }} />
   </button>
-            <PermissionAvatars />
 
-{/* ✅ Group Chat Button */}
-<button
-  onClick={() => setGroupChatOpen(v => !v)}
-  style={{
-    position: 'relative',
-    width: '32px', height: '32px',
-    borderRadius: '10px',
-    background: groupChatOpen ? 'rgb(247,190,57)' : '#fff',
-    border: `1.5px solid ${groupChatOpen ? 'rgb(247,190,57)' : '#e5e7eb'}`,
-    cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.18s',
-    boxShadow: groupChatOpen ? '0 4px 12px rgba(247,190,57,0.35)' : 'none',
-  }}
-  title="Group Chat"
->
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-      stroke={groupChatOpen ? '#1a1a1a' : '#374151'}
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    />
-  </svg>
-  <span style={{
-    position: 'absolute', top: '-4px', right: '-4px',
-    width: '9px', height: '9px', borderRadius: '50%',
-    background: '#22c55e', border: '2px solid #fff',
-  }} />
-</button>
-{/* 🔔 Notification Bell Button */}
-<button
-  style={{
-    position: 'relative',
-    width: '32px', height: '32px',
-    borderRadius: '10px',
-    background: '#fff',
-    border: '1.5px solid #e5e7eb',
-    cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.18s',
-  }}
-  title="Notifications"
->
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
-      stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    />
-    <path
-      d="M13.73 21a2 2 0 0 1-3.46 0"
-      stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    />
-  </svg>
-  {/* Red dot — notification badge */}
-  <span style={{
-    position: 'absolute', top: '-4px', right: '-4px',
-    width: '9px', height: '9px', borderRadius: '50%',
-    background: '#ef4444', border: '2px solid #fff',
-  }} />
-</button>
+  {/* Separator */}
+  <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
 
-            <button onClick={() => setShowDetails(v => !v)} className="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Details</button>
-          </div>
+  {/* Shield + View Policy */}
+  <div style={{ display:'flex', alignItems:'center', gap:'5px', cursor:'pointer' }}>
+    <ShieldEmpty size={18} />
+    <span style={{ fontSize:'12px', color:'#1e40af', textDecoration:'underline', fontWeight:700 }}>View policy</span>
+  </div>
+
+  {/* Separator */}
+  <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
+
+  {/* Budget status pills */}
+  {approvalStatus?.status === 'approved' && (
+    <>
+      <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#dcfce7', border:'1px solid #86efac', fontSize:'11px', fontWeight:700, color:'#166534', whiteSpace:'nowrap' }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        ₹{Number(approvalStatus.approvedBudget).toLocaleString('en-IN')} approved
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#f0fdfa', border:'1px solid #99f6e4', fontSize:'11px', fontWeight:700, color:'#0f766e', whiteSpace:'nowrap' }}>
+        ₹{Math.max(0, Number(approvalStatus.approvedBudget) - grandTotal).toLocaleString('en-IN')} left
+      </div>
+    </>
+  )}
+  {approvalStatus?.status === 'rejected' && (
+    <div style={{ fontSize:'10px', fontWeight:700, color:'#991b1b', background:'#fee2e2', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fecaca', whiteSpace:'nowrap' }}>
+      ❌ Rejected{approvalStatus.managerComment ? ` · ${approvalStatus.managerComment}` : ''}
+    </div>
+  )}
+  {approvalStatus?.status === 'pending' && (
+    <div style={{ fontSize:'10px', fontWeight:700, color:'#92400e', background:'#fef3c7', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fde68a', whiteSpace:'nowrap' }}>
+      ⏳ Approval pending
+    </div>
+  )}
+  {!approvalStatus?.status && (
+    <button
+      type="button"
+      disabled={planFrozen || approvalLoading}
+      onClick={async () => {
+        if (planFrozen || approvalLoading) return;
+        setApprovalLoading(true);
+        try {
+          await axios.post('/api/budget-approvals', {
+            tripId: rfq._id,
+            rfqId: (rfq.rfqId && String(rfq.rfqId).trim()) || '',
+            tripName: rfq.tripName || 'My Trip',
+            requestedBy: 'user',
+            budget: Number(activeBudget) || 0,
+            grandTotal,
+            planItems,
+            destinations: rfq.destinations || [],
+            numberOfAdults: rfq.numberOfAdults || 1,
+            numberOfChildren: rfq.numberOfChildren || 0,
+            numberOfInfants: rfq.numberOfInfants || 0,
+          });
+          const res = await axios.get(`/api/budget-approvals/${rfq._id}`);
+          if (res.data?.success) setApprovalStatus(res.data.data);
+        } catch (err) {
+          alert('Error: ' + (err.response?.data?.message || err.message));
+        } finally { setApprovalLoading(false); }
+      }}
+      style={{ display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'8px', background: planFrozen ? '#f3f4f6' : '#fff', border:'1px solid rgb(247,190,57)', cursor: planFrozen || approvalLoading ? 'not-allowed' : 'pointer', fontSize:'11px', fontWeight:700, color: planFrozen ? '#9ca3af' : 'rgb(180,130,0)', whiteSpace:'nowrap', opacity: planFrozen ? 0.7 : 1 }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      {approvalLoading ? 'Sending...' : 'Send for approval'}
+    </button>
+  )}
+
+  {/* Separator */}
+  <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
+
+  {/* Avatars */}
+  <PermissionAvatars />
+
+  {/* Group Chat */}
+  <button
+    onClick={() => setGroupChatOpen(v => !v)}
+    style={{ position:'relative', width:'28px', height:'28px', borderRadius:'8px', background: groupChatOpen ? 'rgb(247,190,57)' : '#fff', border:`1px solid ${groupChatOpen ? 'rgb(247,190,57)' : '#e5e7eb'}`, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+    title="Group Chat"
+  >
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={groupChatOpen ? '#1a1a1a' : '#374151'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <span style={{ position:'absolute', top:'-3px', right:'-3px', width:'7px', height:'7px', borderRadius:'50%', background:'#22c55e', border:'2px solid #fff' }} />
+  </button>
+
+  {/* Details */}
+  <button
+    onClick={() => setShowDetails(v => !v)}
+    style={{ padding:'5px 12px', borderRadius:'8px', background:'#f3f4f6', border:'1px solid #e5e7eb', cursor:'pointer', fontSize:'12px', fontWeight:700, color:'#374151' }}
+  >
+    Details
+  </button>
+
+</div>
         </div>
       </div>
 
       {/* Details dropdown */}
-      {showDetails && (
-        <div style={{ background:'#e5e7eb', borderBottom:'1px solid #d1d5db', flexShrink:0, padding:'12px 16px' }}>
-          <div style={{ fontSize:'13px', fontWeight:700, color:'#111827', marginBottom:'10px' }}>Trip Details</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 24px', marginBottom:'12px' }}>
-            <div>
-              <div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'2px' }}>TRIP</div>
-              <div style={{ fontSize:'13px', fontWeight:700, color:'#111827' }}>{destNames.join(', ') || '-'}</div>
-            </div>
-            {startDate && <div><div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', marginBottom:'2px' }}>START</div><div style={{ fontSize:'13px', fontWeight:700, color:'#111827' }}>{startDate}</div></div>}
-            {endDate   && <div><div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', marginBottom:'2px' }}>END</div><div style={{ fontSize:'13px', fontWeight:700, color:'#111827' }}>{endDate}</div></div>}
-            {profile.budget   && <div><div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', marginBottom:'2px' }}>BUDGET</div><div style={{ fontSize:'13px', fontWeight:700, color:'#111827' }}>{profile.budget}</div></div>}
-            {profile.reviewer && <div><div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', marginBottom:'2px' }}>REVIEWER</div><div style={{ fontSize:'13px', fontWeight:700, color:'#111827' }}>{profile.reviewer}</div></div>}
-          </div>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:'10px', borderTop:'1px solid #d1d5db' }}>
-            <div>
-              <div style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>TOTAL PRICE</div>
-              <div style={{ fontSize:'18px', fontWeight:800, color: grandTotal > 0 ? '#16a34a' : '#9ca3af' }}>{grandTotal > 0 ? fmt(grandTotal) : '-'}</div>
-            </div>
-            <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center' }}>
-              <button
-                type="button"
-                onClick={handleSendTripReview}
-                disabled={!canSendTripReview || reviewSendLoading || planFrozen}
-                style={{
-                  padding:'8px 18px',
-                  background: planFrozen ? '#dcfce7' : 'rgb(247,190,57)',
-                  color:'#1a1a1a',
-                  border:'none',
-                  borderRadius:'10px',
-                  fontSize:'12px',
-                  fontWeight:700,
-                  cursor: (!canSendTripReview || reviewSendLoading || planFrozen) ? 'not-allowed' : 'pointer',
-                  opacity: (!canSendTripReview || reviewSendLoading) && !planFrozen ? 0.65 : 1,
-                }}
-              >
-                {reviewSendLoading ? '⏳…' : planFrozen ? '✅ Trip locked' : rfq.reviewStatus === 'sent' ? '⏳ Pending' : '📤 Send trip review'}
-              </button>
-              {!budgetApproved && !planFrozen && (
-                <span style={{ fontSize:'10px', color:'#9ca3af' }}>Budget approve pehle</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
+     {showDetails && (
+  <TripDetailsModal
+    rfq={rfq}
+    planItems={planItems}
+    grandTotal={grandTotal}
+    approvalStatus={approvalStatus}
+    onClose={() => setShowDetails(false)}
+  />
+)}
       {/* ══════════════════════════════════════════════
           Responsive Layout
       ══════════════════════════════════════════════ */}
-      
-
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column', position: 'relative' }}>
         {isCompact && (
           <div className="bg-white border-b border-gray-200 flex-shrink-0 overflow-x-auto">
@@ -2488,7 +1794,6 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                 )}
               </div>
             )}
-
             {activePane === 'browse' && (
               <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div className="bg-white border-b border-gray-100 flex-shrink-0 overflow-x-auto">

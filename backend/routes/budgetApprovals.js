@@ -1,12 +1,17 @@
 import express        from 'express';
 import BudgetApproval from '../models/BudgetApproval.js';
+import { verifyToken } from '../middleware/auth.js';
+import User from '../models/User.js';
 const router = express.Router();
+
  // aapka existing RFQ model
 
 // ── POST /api/budget-approvals ──────────────────────────────
 // User "Send Budget Approval" click kare toh
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
+    const userDoc = await User.findOne({ uid: req.uid });
+const assignedTo = userDoc?.managerId || '';
     const {
       tripId,       // rfq._id
       rfqId,        // short display id (optional)
@@ -46,7 +51,8 @@ router.post('/', async (req, res) => {
       tripId,
       rfqId: rfqId != null ? String(rfqId) : '',
       tripName,
-      requestedBy: requestedBy || 'user',
+      requestedBy: req.uid,
+      assignedTo,
       budget,
       grandTotal,
       planItems,
@@ -69,16 +75,42 @@ router.post('/', async (req, res) => {
 
 // ── GET /api/budget-approvals?status=pending ────────────────
 // Manager ki list — pending/approved/rejected sab
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const filter = {};
-    if (req.query.status) filter.status = req.query.status;
+    const currentUser = await User.findOne({ uid: req.uid });
+    if (currentUser?.role === 'manager' || currentUser?.role === 'hr') {
+      filter.assignedTo = req.uid;
+    } else {
+      filter.requestedBy = req.uid;
+    }
+
+    if (req.query.status) {
+      if (req.query.status === 'resolved') {
+        filter.status = { $in: ['approved', 'rejected'] };
+      } else {
+        filter.status = req.query.status;
+      }
+    }
 
     const approvals = await BudgetApproval
       .find(filter)
-      .sort({ sentAt: -1 }); // Latest pehle
+      .sort({ sentAt: -1 });
 
-    res.json({ success: true, data: approvals });
+    // Manually join with User to get names
+    const uids = [...new Set(approvals.map(a => a.requestedBy))];
+    const users = await User.find({ uid: { $in: uids } }, 'uid name email');
+    const userMap = users.reduce((acc, u) => {
+      acc[u.uid] = u.name || u.email;
+      return acc;
+    }, {});
+
+    const dataWithNames = approvals.map(a => ({
+      ...a.toObject(),
+      requestedByName: userMap[a.requestedBy] || 'Unknown User'
+    }));
+
+    res.json({ success: true, data: dataWithNames });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -100,7 +132,7 @@ router.get('/:tripId', async (req, res) => {
 
 // ── PATCH /api/budget-approvals/:tripId ─────────────────────
 // Manager approve/reject kare
-router.patch('/:tripId', async (req, res) => {
+router.patch('/:tripId', verifyToken, async (req, res) => {
   try {
     const { status, approvedBudget, managerComment } = req.body;
 

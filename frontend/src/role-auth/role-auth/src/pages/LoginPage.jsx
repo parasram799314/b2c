@@ -1,23 +1,27 @@
 // ============================================================
 //  LoginPage.jsx
-//  Simple email+password form. Role automatically detect hoti hai
-//  DUMMY_USERS array se (AuthContext.jsx mein define hai).
 // ============================================================
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const Y = 'rgb(247,190,57)';   // brand yellow
+const Y = 'rgb(247,190,57)';
 
 export default function LoginPage() {
-  const { login, error, setError } = useAuth();
+  const { login, register, error, setError } = useAuth();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
+  const [tab, setTab]           = useState('login');
+  const [name, setName]         = useState('');
 
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
-    login(email, password);
+    if (tab === 'login') {
+      await login(email, password);
+    } else {
+      await register(email, password, name);
+    }
     setLoading(false);
   };
 
@@ -58,6 +62,26 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Tab switcher — Error se UPAR */}
+        <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 10, padding: 4, marginBottom: 22 }}>
+          {['login', 'register'].map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => { setTab(t); setError(''); }}
+              style={{
+                flex: 1, padding: '8px', border: 'none', borderRadius: 8,
+                fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                background: tab === t ? '#fff' : 'transparent',
+                color: tab === t ? '#111827' : '#6b7280',
+                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              {t === 'login' ? 'Sign In' : 'Register'}
+            </button>
+          ))}
+        </div>
+
         {/* Error */}
         {error && (
           <div style={{
@@ -71,6 +95,25 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
+
+          {/* Name field — sirf register tab mein, email se UPAR */}
+          {tab === 'register' && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#374151',
+                textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                Full Name
+              </label>
+              <input
+                type="text" required value={name}
+                onChange={e => { setName(e.target.value); setError(''); }}
+                placeholder="Rahul Mehta"
+                style={inp()}
+                onFocus={e => e.target.style.borderColor = Y}
+                onBlur={e  => e.target.style.borderColor = '#e5e7eb'}
+              />
+            </div>
+          )}
+
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: '#374151',
               textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
@@ -113,19 +156,14 @@ export default function LoginPage() {
             onMouseEnter={e => { if (!loading) e.target.style.background = '#e6ad2a'; }}
             onMouseLeave={e => { if (!loading) e.target.style.background = Y; }}
           >
-            {loading ? 'Signing in…' : 'Sign In →'}
+            {/* ✅ Button text dynamic */}
+            {loading
+              ? (tab === 'login' ? 'Signing in…' : 'Registering…')
+              : (tab === 'login' ? 'Sign In →' : 'Create Account →')
+            }
           </button>
         </form>
 
-        {/* Demo hint */}
-        <div style={{
-          marginTop: 22, padding: '12px 14px',
-          background: '#f8fafc', borderRadius: 12,
-          border: '1px dashed #e2e8f0', fontSize: 12, color: '#475569',
-        }}>
-          
-       
-        </div>
       </div>
     </div>
   );

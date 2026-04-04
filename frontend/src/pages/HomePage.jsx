@@ -6,6 +6,7 @@ import heroBg from '../assets/hero-bg.png';
 import axios from 'axios';
 import { useAuth } from '../role-auth/role-auth/src/context/AuthContext';
 import ManagerApprovalsSection from '../components/ManagerPanel';
+import HeaderProfileMenu from '../components/detail/headings/HeaderProfileMenu';
 
 // ─── TP Profile Form Popup ────────────────────────────────────────────────────
 function TpProfilePopup({ onClose }) {
@@ -96,12 +97,15 @@ export default function HomePage({
   onDeleteItinerary,
   onAddToPlan,
   currentUser,
+  onOpenHRDashboard,
 }) {
   const { user, logout } = useAuth();
   const isManager = user?.role === 'manager';
+  const isHR = user?.role === 'hr';
   const [budgetApprovals, setBudgetApprovals] = useState([]);
   const [tripReviews, setTripReviews] = useState([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
 
   // Load both budget approvals and trip reviews when manager clicks Approvals tab
   // Load both budget approvals and trip reviews when manager clicks Approvals tab
@@ -115,11 +119,12 @@ export default function HomePage({
       
       try {
         // दोनों API को एक साथ कॉल करें (Faster Performance)
-        const [budgetRes, tripRes] = await Promise.all([
-          axios.get('/api/budget-approvals?status=pending'),
-          axios.get('/api/rfqs?pendingTripReview=true')
-        ]);
-
+      const [budgetRes, tripRes, historyBudgetRes, historyTripRes] = await Promise.all([
+  axios.get('/api/budget-approvals?status=pending'),
+  axios.get('/api/rfqs?pendingTripReview=true'),
+  axios.get('/api/budget-approvals?status=resolved'),   // approved/rejected budget
+  axios.get('/api/rfqs?reviewStatus=approved,rejected'), // approved/rejected trips
+]);
         if (budgetRes.data?.success) {
           setBudgetApprovals(budgetRes.data.data || []);
         }
@@ -146,12 +151,12 @@ export default function HomePage({
     return () => clearInterval(syncInterval);
   }, [isManager]);
 
-  const handleApprove = async (tripId) => {
+  const handleApprove = async (tripId, note = '') => {
     try {
       await axios.patch(`/api/budget-approvals/${tripId}`, {
         status: 'approved',
         approvedBudget: null, // Use original budget
-        managerComment: ''
+        managerComment: note
       });
       // Refresh list
       setBudgetApprovals(prev => prev.filter(a => a.tripId !== tripId));
@@ -160,11 +165,11 @@ export default function HomePage({
     }
   };
 
-  const handleReject = async (tripId) => {
+  const handleReject = async (tripId, note = '') => {
     try {
       await axios.patch(`/api/budget-approvals/${tripId}`, {
         status: 'rejected',
-        managerComment: 'Rejected by manager'
+        managerComment: note
       });
       // Refresh list
       setBudgetApprovals(prev => prev.filter(a => a.tripId !== tripId));
@@ -173,18 +178,18 @@ export default function HomePage({
     }
   };
 
-  const handleTripApprove = async (tripId) => {
+  const handleTripApprove = async (tripId, note = '') => {
     try {
-      await axios.post(`/api/rfqs/${tripId}/approve-review`);
+      await axios.post(`/api/rfqs/${tripId}/approve-review`, { managerNote: note });
       setTripReviews(prev => prev.filter(t => t._id !== tripId));
     } catch (err) {
       alert('Failed to approve trip: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  const handleTripReject = async (tripId) => {
+  const handleTripReject = async (tripId, note = '') => {
     try {
-      await axios.post(`/api/rfqs/${tripId}/reject-review`);
+      await axios.post(`/api/rfqs/${tripId}/reject-review`, { managerNote: note });
       setTripReviews(prev => prev.filter(t => t._id !== tripId));
     } catch (err) {
       alert('Failed to reject trip: ' + (err.response?.data?.message || err.message));
@@ -192,7 +197,7 @@ export default function HomePage({
   };
 
   const [page, setPage]             = useState(1);
-  const [showTpForm, setShowTpForm] = useState(false);
+  const [activeProfile, setActiveProfile] = useState('business');
   const [showApprovals, setShowApprovals] = useState(false);
 
   const pageSize     = 6;
@@ -210,42 +215,17 @@ export default function HomePage({
             <img src="https://travplatforms.com/images/logo3.png" alt="TravPlatforms" style={{ height: '35px', objectFit: 'contain' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* User display */}
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-              {user?.name || user?.email}
-            </span>
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowTpForm(v => !v)}
-                style={{
-                  width: '36px', height: '36px', borderRadius: '50%',
-                  background: '#fff', border: '2px solid rgba(0,0,0,0.08)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: 700, color: '#374151',
-                  boxShadow: showTpForm ? '0 0 0 3px rgba(247,190,57,0.4)' : 'none',
-                  transition: 'box-shadow 0.2s',
-                }}
-              >
-                TP
-              </button>
-              {showTpForm && <TpProfilePopup onClose={() => setShowTpForm(false)} />}
-            </div>
-            <button
-              onClick={logout}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '18px',
-                fontWeight: 700,
-                color: '#6b7280',
-                paddingBottom: '8px',
-                borderBottom: '2px solid transparent',
-                transition: 'all 0.2s',
-              }}
-            >
-              Logout
-            </button>
+          
+      
+            <HeaderProfileMenu
+  user={user}
+  onLogout={logout}
+  onOpenHRDashboard={onOpenHRDashboard}
+  activeProfile={activeProfile}        // 'business' ya 'personal' — apna state manage karo
+  onSwitchProfile={(type) => setActiveProfile(type)}
+/>
+           
+          
           </div>
         </div>
       </header>
@@ -337,6 +317,7 @@ export default function HomePage({
   <ManagerApprovalsSection
     budgetApprovals={budgetApprovals}
     tripReviews={tripReviews}
+    historyItems={historyItems}
     approvalsLoading={approvalsLoading}
     onApprove={handleApprove}
     onReject={handleReject}
