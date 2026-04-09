@@ -7,11 +7,50 @@ const userSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   role: {
     type: String,
-    enum: ['hr', 'manager', 'employee'],
+    enum: ['hr', 'manager', 'employee', 'admin'],
     default: 'employee',
   },
   managerId: { type: String, default: null },
   companyId: { type: String, default: '' },
+
+
+ // --- New Profile Fields ---
+  profile: {
+    // Personal & Identity
+    gender: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    passportNo: { type: String, default: '' },
+    passportExpiry: { type: String, default: '' },
+    nationality: { type: String, default: 'Indian' },
+    dob: { type: String, default: '' },
+    
+    // Travel Preferences
+    flightClass: { type: String, default: 'Economy' },
+    seatPreference: { type: String, default: 'Window' },
+    mealPreference: { type: String, default: 'Vegetarian' },
+    flightKeywords: { type: String, default: '' },
+    hotelType: { type: String, default: 'Standard' },
+    roomType: { type: String, default: 'Non-Smoking' },
+    hotelOtherPrefs: { type: String, default: '' },
+    carRental: { type: String, default: 'No Preference' },
+    knownTravelerNo: { type: String, default: '' },
+    frequentFlyer: { type: String, default: '' },
+    hotelLoyalty: { type: String, default: '' },
+
+    // Emergency
+    emergencyName: { type: String, default: '' },
+    emergencyPhone: { type: String, default: '' },
+
+    // Business (Default Profile)
+    employeeId: { type: String, default: '' },
+    department: { type: String, default: '' },
+    designation: { type: String, default: '' },
+    reportingManager: { type: String, default: '' },
+    costCenter: { type: String, default: '' },
+    annualBudget: { type: Number, default: 0 },
+    perTripLimit: { type: Number, default: 0 },
+  },
+
 
   // ── Daily Chat Token Limit ─────────────────────────────
   chatTokens: {

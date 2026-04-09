@@ -185,16 +185,20 @@ budget:   { type: Number, default: 0  },
     reviewSentAt:  { type: String, default: '' },
     reviewApprovedAt: { type: String, default: '' },
     reviewPayload: { type: mongoose.Schema.Types.Mixed, default: null },
+    planItems:     { type: [mongoose.Schema.Types.Mixed], default: [] },
     
     createdBy:  { type: String, default: '' }, // Firebase UID
 assignedTo: { type: String, default: '' }, // Manager ka Firebase UID
 companyId:  { type: String, default: '' },
 
     // Visa info
+   
    visaInfo: {
   required:  { type: Boolean },
   visaType:  { type: String },   // 'type' → 'visaType'
   label:     { type: String },
+  isMerged:   { type: Boolean, default: false },
+mergedFrom: { type: [String], default: [] },
 },
   },
   { timestamps: true }

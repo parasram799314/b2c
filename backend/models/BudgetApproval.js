@@ -19,6 +19,7 @@ const budgetApprovalSchema = new mongoose.Schema({
     default: 'pending',
   },
   sentAt:         { type: Date, default: Date.now },
+  userNote:       { type: String, default: '' },
   approvedBudget: { type: Number, default: null },
   managerComment: { type: String, default: '' },
   actionAt:       { type: Date, default: null },

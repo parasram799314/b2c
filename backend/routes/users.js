@@ -125,6 +125,75 @@ router.get('/chat-tokens', verifyToken, async (req, res) => {
   }
 });
 
+
+
+router.get('/profile', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findOne({ uid: req.uid });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    // Find manager name if managerId exists
+    let managerName = '';
+    let managerUid = '';
+
+    if (user.managerId) {
+      const manager = await User.findOne({ uid: user.managerId }, 'uid name email');
+      if (manager) {
+        managerName = manager.name || manager.email;
+        managerUid = manager.uid;
+      }
+    }
+
+    // Fallback to profile.reportingManager or profile.reviewer if managerName is still empty
+    if (!managerName && (user.profile?.reportingManager || user.profile?.reviewer)) {
+      const reporting = user.profile.reportingManager || user.profile.reviewer;
+      // 1. Try treating it as a UID
+      const mByUid = await User.findOne({ uid: reporting }, 'uid name email');
+      if (mByUid) {
+        managerName = mByUid.name || mByUid.email;
+        managerUid = mByUid.uid;
+      } else {
+        // 2. Try treating it as a Name
+        const mByName = await User.findOne({ 
+          role: 'manager', 
+          $or: [
+            { name: new RegExp('^' + reporting + '$', 'i') },
+            { email: new RegExp('^' + reporting + '$', 'i') }
+          ]
+        }, 'uid name email');
+        
+        if (mByName) {
+          managerName = mByName.name || mByName.email;
+          managerUid = mByName.uid;
+        } else {
+          // 3. Just use the string as-is
+          managerName = reporting;
+        }
+      }
+    }
+
+    res.json({ success: true, data: { ...user.toObject(), managerName, managerUid } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+// 2. Update Profile
+router.patch('/profile', verifyToken, async (req, res) => {
+  try {
+    const updateData = req.body; // Frontend se pura profile object aayega
+    const user = await User.findOneAndUpdate(
+      { uid: req.uid },
+      { $set: { profile: updateData, name: updateData.fullName || "" } },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, data: user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/users/chat-tokens/deduct — message send hone ke baad tokens kaato
 router.post('/chat-tokens/deduct', verifyToken, async (req, res) => {
   try {

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import MyProfileDashboard from './MyProfileDashboard';
+
 
 // ─── Inline SVG Icons ─────────────────────────────────────────────────────────
 const IconUser = ({ size = 16, color = 'currentColor' }) => (
@@ -6,6 +8,7 @@ const IconUser = ({ size = 16, color = 'currentColor' }) => (
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
   </svg>
 );
+
 const IconBriefcase = ({ size = 16, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
@@ -65,10 +68,12 @@ export default function HeaderProfileMenu({
   user,
   onLogout,
   onOpenHRDashboard,
+  onOpenAdminDashboard,
   activeProfile = 'business',
   onSwitchProfile,
 }) {
   const [open, setOpen] = useState(false);
+  const [showMyProfile, setShowMyProfile] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -233,11 +238,26 @@ export default function HeaderProfileMenu({
                   <IconShield size={16} color="#fff" />
                 </span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#111' }}>HR Admin Panel</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#111' }}>Admin Panel</div>
                   <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>Manage employees & trips</div>
                 </div>
                 <IconChevronRight />
               </button>
+              <button className="tpm-item" onClick={() => { setOpen(false); onOpenAdminDashboard?.(); }}>
+  <span style={{
+    width: '34px', height: '34px', borderRadius: '9px', flexShrink: 0,
+    background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+    </svg>
+  </span>
+  <div style={{ flex: 1 }}>
+    <div style={{ fontSize: '13px', fontWeight: 600, color: '#111' }}>Admin Dashboard</div>
+    <div style={{ fontSize: '11px', color: '#999', marginTop: '1px' }}>Stats, users, approvals</div>
+  </div>
+</button>
               <div style={{ height: '1px', background: '#f0f0f0' }} />
             </>
           )}
@@ -251,32 +271,20 @@ export default function HeaderProfileMenu({
             Switch Profile
           </div>
 
-          {/* Business Profile */}
+          {/* My Profile  */}
           <ProfileRow
             icon={<IconBriefcase size={15} color={activeProfile === 'business' ? '#1a1a1a' : '#777'} />}
             iconBg={activeProfile === 'business' ? 'rgb(247,190,57)' : '#f0f0f0'}
             iconShadow={activeProfile === 'business' ? 'rgba(247,190,57,0.45)' : 'transparent'}
-            label="Business Profile"
+            label="My Profile"
             sublabel="Work travel & expenses"
             active={activeProfile === 'business'}
             checkBg="rgb(247,190,57)"
             checkColor="#1a1a1a"
-            onClick={() => onSwitchProfile?.('business')}
+           onClick={() => { setOpen(false); setShowMyProfile(true); }}
           />
 
-          {/* Personal Profile */}
-          <ProfileRow
-            icon={<IconUser size={15} color={activeProfile === 'personal' ? '#fff' : '#777'} />}
-            iconBg={activeProfile === 'personal' ? '#4f46e5' : '#f0f0f0'}
-            iconShadow={activeProfile === 'personal' ? 'rgba(79,70,229,0.4)' : 'transparent'}
-            label="Personal Profile"
-            sublabel="Leisure & personal trips"
-            active={activeProfile === 'personal'}
-            checkBg="#4f46e5"
-            checkColor="#fff"
-            onClick={() => onSwitchProfile?.('personal')}
-          />
-
+         
           <div style={{ height: '1px', background: '#f0f0f0', margin: '4px 0' }} />
 
           {/* Logout */}
@@ -291,6 +299,14 @@ export default function HeaderProfileMenu({
           </button>
         </div>
       )}
+      {showMyProfile && (
+        <MyProfileDashboard
+          user={user}
+          onClose={() => setShowMyProfile(false)}
+          onSave={(type, data) => console.log('Saved:', type, data)}
+        />
+      )}
+
     </div>
   );
 }

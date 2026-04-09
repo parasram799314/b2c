@@ -1,4 +1,5 @@
 // ui/cards/ItineraryCard.jsx
+import { useState, useRef, useEffect } from 'react';
 import { Icons } from '../icons';
 
 const DEST_IMAGES = {
@@ -24,35 +25,153 @@ function getImg(rfq) {
 }
 
 function getTitle(rfq) {
+  if (rfq.tripName) return rfq.tripName;
   const dest   = rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || 'Trip';
-  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 1;
-
-  // ✅ rfqId directly from MongoDB field (e.g. "A24CIM")
-  // MongoDB ka ObjectId _id kabhi display nahi karte
-  const displayId = rfq.rfqId || '';
-
-  return `${displayId ? `${displayId} · ` : ''}${dest} ${nights + 1}-Day Tour`;
+  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 0;
+  return `${dest} ${nights + 1}-Day Tour`;
 }
 
 function getMeta(rfq) {
-  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 1;
-  const cities = rfq.destinations?.length || 1;
-  const date   = new Date(rfq.createdAt).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-  return { days: nights + 1, cities, date };
+  const nights = rfq.destinations?.reduce((s, d) => s + (d.numberOfNights || d.nights || 0), 0) || 0;
+  const cities = rfq.destinations?.length || 0;
+  
+  // Departure date prioritize rfq.depDate or first destination date
+  // planItems se first aur last date nikalo
+const itemDates = (rfq.planItems || [])
+  .map(p => p.depDate || p.checkIn || p.pickupDate || p.date || '')
+  .filter(Boolean)
+  .sort();
+
+const firstItemDate = itemDates[0] || null;
+const lastItemDate  = itemDates[itemDates.length - 1] || null;
+
+const dateStr = firstItemDate || rfq.depDate || rfq.destinations?.[0]?.dateOfArrival || rfq.createdAt;
+  let displayDate = '—';
+  if (dateStr) {
+    try {
+      displayDate = new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+      });
+    } catch (e) {
+      displayDate = dateStr;
+    }
+  }
+
+  // Count items by type
+  const items = rfq.planItems || [];
+  const counts = {
+    hotels:      items.filter(p => p.type === 'hotel' && !p._isHotelContinuation).length,
+    flights:     items.filter(p => p.type === 'flight').length,
+    attractions: items.filter(p => p.type === 'attraction').length,
+    transfers:   items.filter(p => (p.type === 'transfer' || p.type === 'transport')).length,
+    others:      items.filter(p => (p.type === 'other' || p.type === 'restaurant')).length,
+  };
+
+  // Last item date format karo
+let lastDate = '';
+if (lastItemDate) {
+  try {
+    lastDate = new Date(lastItemDate).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+  } catch (e) { lastDate = lastItemDate; }
 }
 
+return { days: nights + 1, nights, cities, date: displayDate, lastDate, counts };
+}
+
+// ── Confirm Dialog ──────────────────────────────────────────────────────────
+function ConfirmDialog({ onConfirm, onCancel }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-6 mx-4 w-full max-w-xs"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-center w-12 h-12 bg-red-50 rounded-full mx-auto mb-4">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M8 3h6M3 6h16M5 6l1 13h10L17 6" stroke="#ef4444" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9 10v5M13 10v5" stroke="#ef4444" strokeWidth="1.6" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <h3 className="text-center text-gray-800 font-bold text-base mb-1">Delete Itinerary?</h3>
+        <p className="text-center text-gray-400 text-sm mb-5">
+          This action cannot be undone. Are you sure you want to delete this trip?
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+          >
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Three-Dot Menu ──────────────────────────────────────────────────────────
+function ThreeDotMenu({ onDeleteRequest }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    if (open) document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        className="w-8 h-8 bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center transition-all"
+        title="More options"
+      >
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+          <circle cx="2.5" cy="7.5" r="1.4"/>
+          <circle cx="7.5" cy="7.5" r="1.4"/>
+          <circle cx="12.5" cy="7.5" r="1.4"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-10 bg-white rounded-xl shadow-xl border border-gray-100 py-1 min-w-[130px] z-30">
+          <button
+            onClick={() => { setOpen(false); onDeleteRequest(); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors font-medium"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 2h4M2 4h10M3.5 4l.7 8h5.6l.7-8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Card ───────────────────────────────────────────────────────────────
 export default function ItineraryCard({ rfq, onOpen, onDelete }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const img   = getImg(rfq);
   const title = getTitle(rfq);
   const meta  = getMeta(rfq);
   const dest  = rfq.destinations?.[0]?.destination || 'Unknown';
-
-  const stats = rfq.checklistStats;
-  const progressPct = stats?.total > 0
-    ? Math.round((stats.completed / stats.total) * 100)
-    : 0;
 
   const planStatus = rfq.reviewStatus === 'approved'  ? 'approved'
     : rfq.reviewStatus === 'sent'      ? 'pending'
@@ -61,102 +180,178 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
     : rfq.reviewStatus === 'rejected'  ? 'rejected'
     : null;
 
+  const isBusiness = true;
+
   return (
-    <div
-      className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
-      onClick={() => onOpen(rfq)}
-    >
-      <div className="relative h-36 overflow-hidden">
-        <img
-          src={img}
-          alt={dest}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={e => { e.target.src = DEST_IMAGES.default; }}
+    <>
+      {showConfirm && (
+        <ConfirmDialog
+          onConfirm={() => { setShowConfirm(false); onDelete?.(rfq._id); }}
+          onCancel={() => setShowConfirm(false)}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+      )}
 
-        {rfq.travelType && (
-          <div className="absolute top-2 left-2 bg-gold-500/90 text-white text-xs font-bold rounded-full px-2.5 py-0.5">
-            {rfq.travelType}
-          </div>
-        )}
-
-        {/* Plan status badge — MongoDB reviewStatus se */}
-        {planStatus && (
-          <div className="absolute top-2 right-9" style={{
-            fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-            background: planStatus === 'approved' ? '#dcfce7' : planStatus === 'paid' ? '#dcfce7' : planStatus === 'cancelled' ? '#fee2e2' : planStatus === 'rejected' ? '#fee2e2' : '#fef3c7',
-            color:      planStatus === 'approved' ? '#166534' : planStatus === 'paid' ? '#16a34a' : planStatus === 'cancelled' ? '#dc2626' : planStatus === 'rejected' ? '#991b1b' : '#92400e',
+<div
+  className="relative group cursor-pointer"
+  style={{ paddingTop: '5px' }}
+  onClick={() => onOpen(rfq)}
+>
+        {/* ✅ BUSINESS TRAVEL TAG (External style) */}
+        {isBusiness && (
+          <span style={{ 
+            position: 'absolute', 
+            top: '-9px', 
+            left: '12px',
+            zIndex: 10, 
+            fontSize: '8px', 
+            fontWeight: 900, 
+            padding: '2px 10px', 
+            borderRadius: '4px', 
+            background: 'rgb(247,190,57)', 
+            color: '#1a1a1a', 
+            border: '1.5px solid #f59e0b', 
+            letterSpacing: '0.08em', 
+            textTransform: 'uppercase', 
+            boxShadow: '0 2px 6px rgba(247,190,57,0.45)', 
+            whiteSpace: 'nowrap' 
           }}>
-            {planStatus === 'approved' ? '✓ Approved' : planStatus === 'paid' ? '✓ Paid' : planStatus === 'cancelled' ? 'Cancelled' : planStatus === 'rejected' ? 'Rejected' : 'Pending'}
-          </div>
+            💼 Business Travel
+          </span>
         )}
 
-        <button
-          onClick={e => { e.stopPropagation(); onDelete?.(rfq._id); }}
-          className="absolute top-2 right-2 w-6 h-6 bg-black/40 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-xs transition-colors opacity-0 group-hover:opacity-100"
-        >
-          <Icons.Trash size={14} />
-        </button>
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
+          {/* ── Image Section ── */}
+          <div className="relative overflow-hidden" style={{ height: '170px' }}>
+            <img
+              src={img}
+              alt={dest}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={e => { e.target.src = DEST_IMAGES.default; }}
+            />
 
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <div className="text-white font-bold text-sm leading-tight truncate">{title}</div>
-          <div className="text-white/70 text-xs mt-0.5">
-            {rfq.guestCountry || rfq.from || 'India'} → {rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || dest}
+            {/* ✅ TOP ROW: Only 3-dot (right) */}
+            <div className="absolute top-0 left-0 right-0 flex items-start justify-end px-2 pt-2">
+              <ThreeDotMenu onDeleteRequest={() => setShowConfirm(true)} />
+            </div>
+
+            {/* ✅ BOTTOM ROW: Meta pills (left) + plan status (right) */}
+            <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between px-2 pb-2">
+              <div className="flex flex-wrap items-center gap-1 max-w-[70%]">
+                {/* Nights Pill */}
+                <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-2 h-5 leading-none">
+                  <Icons.Calendar size={9} className="flex-shrink-0" />
+                  {meta.nights} {meta.nights === 1 ? 'nt' : 'nts'}
+                </span>
+                
+                {/* City Pill */}
+                <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-2 h-5 leading-none">
+                  <Icons.MapPin size={9} className="flex-shrink-0" />
+                  {meta.cities} {meta.cities === 1 ? 'city' : 'cities'}
+                </span>
+
+                {/* Dynamic Category Pills */}
+                {meta.counts.hotels > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-1.5 h-5 leading-none" title="Hotels">
+                    <Icons.Hotel size={9} className="flex-shrink-0" />
+                    {meta.counts.hotels}
+                  </span>
+                )}
+                {meta.counts.flights > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-1.5 h-5 leading-none" title="Flights">
+                    <Icons.Plane size={9} className="flex-shrink-0" />
+                    {meta.counts.flights}
+                  </span>
+                )}
+                {meta.counts.attractions > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-1.5 h-5 leading-none" title="Attractions">
+                    <Icons.Star size={9} className="flex-shrink-0" />
+                    {meta.counts.attractions}
+                  </span>
+                )}
+                {meta.counts.transfers > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-1.5 h-5 leading-none" title="Transfers">
+                    <Icons.Car size={9} className="flex-shrink-0" />
+                    {meta.counts.transfers}
+                  </span>
+                )}
+                {meta.counts.others > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-gray-900/75 backdrop-blur-sm text-white text-[9px] font-bold rounded-full px-1.5 h-5 leading-none" title="Other items">
+                    <Icons.Note size={9} className="flex-shrink-0" />
+                    {meta.counts.others}
+                  </span>
+                )}
+              </div>
+
+              {planStatus && (
+                <span style={{
+                  fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px',
+                  background: planStatus === 'approved' ? '#dcfce7' : planStatus === 'paid' ? '#dcfce7' : planStatus === 'cancelled' ? '#fee2e2' : planStatus === 'rejected' ? '#fee2e2' : '#fef3c7',
+                  color:      planStatus === 'approved' ? '#166534' : planStatus === 'paid' ? '#16a34a' : planStatus === 'cancelled' ? '#dc2626' : planStatus === 'rejected' ? '#991b1b' : '#92400e',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                  textTransform: 'uppercase'
+                }}>
+                  {planStatus === 'approved' ? '✓ Approved' : planStatus === 'paid' ? '✓ Paid' : planStatus === 'cancelled' ? 'Cancelled' : planStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ── White Details Section ── */}
+          <div className="px-4 py-3">
+            {/* Title */}
+            <h3 className="text-gray-900 font-bold text-sm leading-tight truncate mb-1">
+              {title}
+            </h3>
+
+            {/* Route & ID Row */}
+            <div className="flex items-center gap-2 mb-3">
+              {rfq.rfqId && (
+                <span style={{ 
+                  background: 'rgb(247, 190, 57)', 
+                  color: '#1a1a1a', 
+                  fontSize: '9px', 
+                  fontWeight: 900, 
+                  padding: '2px 6px', 
+                  borderRadius: '4px',
+                  flexShrink: 0
+                }}>
+                  {rfq.rfqId}
+                </span>
+              )}
+              <div className="flex items-center gap-1 text-gray-400 text-[11px] truncate">
+                <Icons.MapPin size={10} className="flex-shrink-0" />
+                <span className="truncate">{rfq.guestCountry || rfq.from || 'India'}</span>
+                <span className="mx-0.5 text-gray-300">→</span>
+                <span className="truncate font-medium text-gray-500">{rfq.destinations?.map(d => d.destination).filter(Boolean).join(', ') || dest}</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-gray-100 mb-3" />
+
+            {/* Date + View Plan */}
+            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+  <Icons.Calendar size={12} />
+  {meta.lastDate && meta.date !== meta.lastDate ? (
+    <span>{meta.date} → {meta.lastDate}</span>
+  ) : (
+    <span>{meta.date}</span>
+  )}
+</div>
+              <button
+                onClick={e => { e.stopPropagation(); onOpen(rfq); }}
+                className="text-xs font-bold text-amber-500 hover:text-amber-600 flex items-center gap-1 transition-colors"
+              >
+                View Plan
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      <div className="p-3">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Icons.Calendar size={14} />
-            <span className="font-semibold">{meta.days} days</span>
-          </div>
-          <div className="w-px h-3 bg-gray-200" />
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Icons.MapPin size={14} />
-            <span className="font-semibold">
-              {meta.cities} {meta.cities === 1 ? 'city' : 'cities'}
-            </span>
-          </div>
-          <div className="w-px h-3 bg-gray-200" />
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Icons.Hotel size={14} />
-            <span className="font-semibold">
-              {rfq.requireHotels ? 'Hotels' : 'No hotel'}
-            </span>
-          </div>
-        </div>
-
-        {stats?.total > 0 && (
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">Checklist</span>
-              <span className="text-xs font-semibold text-gray-600">{progressPct}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-1.5 bg-gold-500 rounded-full transition-all"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">{meta.date}</span>
-          <button
-            onClick={e => { e.stopPropagation(); onOpen(rfq); }}
-            className="text-xs font-semibold text-gold-600 hover:text-gold-700 flex items-center gap-1"
-          >
-            View Plan
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

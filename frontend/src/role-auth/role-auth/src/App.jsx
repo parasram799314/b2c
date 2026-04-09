@@ -53,18 +53,17 @@ function UserApp() {
   const [itineraries, setItineraries] = useState([]);
   const [error, setError]             = useState('');
 
-  // 1. Initial Load
+  // 1. Initial Load - Always from database (API)
   useEffect(() => {
     const loadData = async () => {
       try {
         const r = await axios.get('/api/rfqs');
         if (r.data?.data) {
           setItineraries(r.data.data);
-          localStorage.setItem('itineraries', JSON.stringify(r.data.data));
         }
-      } catch {
-        const saved = JSON.parse(localStorage.getItem('itineraries') || '[]');
-        setItineraries(saved);
+      } catch (err) {
+        console.error('Failed to load itineraries from database:', err);
+        setItineraries([]);
       }
     };
     loadData();
@@ -78,18 +77,15 @@ function UserApp() {
     try {
       const res = await axios.post('/api/rfqs', formData);
       finalRfq = res.data.data;
-    } catch {
-      finalRfq = {
-        _id: 'trip_' + Date.now(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-        status: 'draft',
-      };
+    } catch (err) {
+      console.error('Failed to create itinerary:', err);
+      setError('Failed to create itinerary. Please try again.');
+      setLoading(false);
+      return;
     }
     if (finalRfq) {
       const updated = [finalRfq, ...itineraries];
       setItineraries(updated);
-      localStorage.setItem('itineraries', JSON.stringify(updated));
       setCurrentRfq(finalRfq);
       setPage('detail');
     }
@@ -98,10 +94,15 @@ function UserApp() {
 
   // 3. Delete
   const handleDelete = async id => {
-    try { await axios.delete(`/api/rfqs/${id}`); } catch { /* deleted locally */ }
+    try { 
+      await axios.delete(`/api/rfqs/${id}`); 
+    } catch (err) {
+      console.error('Failed to delete itinerary:', err);
+      setError('Failed to delete itinerary. Please try again.');
+      return;
+    }
     const filtered = itineraries.filter(it => it._id !== id);
     setItineraries(filtered);
-    localStorage.setItem('itineraries', JSON.stringify(filtered));
   };
 
   // ── Render ─────────────────────────────────────────────────
@@ -115,7 +116,6 @@ function UserApp() {
             item._id === updated._id ? updated : item
           );
           setItineraries(newList);
-          localStorage.setItem('itineraries', JSON.stringify(newList));
         }}
         onBack={() => setPage('home')}
         // Optional: pass currentUser so DetailPage can show SendToManagerButton

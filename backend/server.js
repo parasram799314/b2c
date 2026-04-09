@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import rfqRoutes from './routes/rfq.js';
 import flightRoutes from './routes/flights.js';
 import budgetApprovalRoutes from './routes/budgetApprovals.js';
+import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
 
 dotenv.config();
@@ -15,8 +16,14 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// ── Specific API Routes First ──────────────────────────────────────────────
 app.use('/api/users', userRoutes);
 app.use('/api/rfqs', rfqRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/budget-approvals', budgetApprovalRoutes);
+
+// ── General Flight API ─────────────────────────────────────────────────────
+// Mounted at /api so /api/search and /api/prices still work
 app.use('/api', flightRoutes);
 
 app.get('/health', (req, res) => {
@@ -31,9 +38,15 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/budget-approvals', budgetApprovalRoutes);
+// 404 Debug Handler
+app.use((req, res) => {
+  console.log(`[404] Missing Route: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    success: false, 
+    message: `Backend route not found: ${req.method} ${req.url}. Check server.js mounting.` 
+  });
+});
 
-// Pehle port sunno — taaki frontend proxy ko ECONNREFUSED na mile jab tak Mongo slow / galat ho
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);

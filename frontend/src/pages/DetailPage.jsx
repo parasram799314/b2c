@@ -15,6 +15,7 @@ import { Icons } from '../ui/icons';
 import PlanPanel, { BookView } from '../components/detail/PlanPanel';
 import PermissionAvatars from '../components/detail/headings/PermissionAvatars';
 import axios from 'axios'; // ✅ Ye line add karo
+import TripVoucherModal from '../components/detail/headings/TripVoucherModal';
 import PlanCard, {
   ShieldEmpty,
   fmt,
@@ -440,6 +441,9 @@ function DestinationTimeline({
   tripReviewStatus = 'draft',
   onViewAttachments,
   onUpdateItem,  
+  onMoveToTrip,
+  currentTripId,
+  onShowVoucher
  
 }) {
   const [collapsedDays, setCollapsedDays] = useState({});
@@ -520,21 +524,24 @@ planItems.forEach(item => {
   if (!d) d = 'No Date';
 
   // ✅ Hotel ke liye multiple days generate karo (Nights logic)
-  if (item.type === 'hotel' && item.nights && Number(item.nights) > 1) {
+  if (item.type === 'hotel' && item.nights && Number(item.nights) > 0) {
     const nights = Number(item.nights);
-    for (let n = 0; n < nights; n++) {
+    // Loop from 0 to 'nights' to include the checkout day
+    for (let n = 0; n <= nights; n++) {
       const baseDate = new Date(d + 'T00:00:00');
       baseDate.setDate(baseDate.getDate() + n);
       const dk = `${baseDate.getFullYear()}-${String(baseDate.getMonth()+1).padStart(2,'0')}-${String(baseDate.getDate()).padStart(2,'0')}`;
 
-      
       if (!dayGroupsMap[dk]) dayGroupsMap[dk] = [];
       
       if (n === 0) {
-        // Pehle din full card
-        dayGroupsMap[dk].push({ ...item, _totalNights: nights });
+        // Check-in day
+        dayGroupsMap[dk].push({ ...item, _isCheckIn: true, _totalNights: nights });
+      } else if (n === nights) {
+        // Check-out day
+        dayGroupsMap[dk].push({ ...item, _isCheckOut: true, _totalNights: nights, date: dk });
       } else {
-        // Agle dinon ke liye sirf continuation marker
+        // Intermediate nights
         dayGroupsMap[dk].push({
           ...item,
           id: `${item.id}_night_${n}`,
@@ -621,16 +628,7 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
       </span>
     )}
     <span style={{ color: '#e5e7eb' }}>|</span>
-    {activeItems.map((item, index) => (
-      <Fragment key={item.type}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#6b7280', fontSize: '11px', fontWeight: 600 }}>
-          <span style={{ fontSize: '12px' }}>{item.icon}</span>
-          <span style={{ color: '#111827', fontWeight: 800 }}>{item.count}</span>
-          <span>{item.count > 1 ? item.label : item.label.replace(/s$/, '')}</span>
-        </div>
-        {index < activeItems.length - 1 && <span style={{ color: '#e5e7eb' }}>|</span>}
-      </Fragment>
-    ))}
+  
   </div>
   {/* RIGHT: Attachments + Download + Toggle */}
   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -682,8 +680,61 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
        onDragOver={handleDragOver}   // <--- Add this
         onDragLeave={handleDragLeave} // <--- Add this
         onDrop={handleDrop} 
-        style={{ flex: 1, overflowY: 'auto', padding: '28px 24px 16px', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+        style={{ flex: 1, overflowY: 'auto', padding: '0px 24px 16px', background: '#fff', display: 'flex', flexDirection: 'column' }}>
 
+
+{/* ✅ YE NAYA ROW HAI - DONO MODES KE LIYE COMMON */}
+{/* ✅ FIXED/STICKY SUMMARY ROW */}
+{planItems.length > 0 && (
+  <div style={{ 
+    position: 'sticky',      /* Fixed position scroll karne par */
+    top: 0,                  /* Sabse upar chipak jayega */
+    zIndex: 20,              /* Cards ke upar rahega */
+    background: '#fff',      /* White background taaki piche ka content na dikhe */
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingTop: '8px',       /* Thodi si space top se */
+    paddingBottom: '12px', 
+    marginBottom: '16px',
+    borderBottom: '1px solid #f3f4f6'
+  }}>
+    {/* Left Side: Icons */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      {activeItems.map((item, idx) => (
+        <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '18px' }}>{item.icon}</span> 
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: '#111827', lineHeight: 1 }}>{item.count}</span>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'capitalize' }}>
+              {item.count > 1 ? item.label : item.label.replace(/s$/, '')}
+            </span>
+          </div>
+          {idx < activeItems.length - 1 && (
+            <div style={{ width: '1px', height: '16px', background: '#e5e7eb', marginLeft: '4px' }} />
+          )}
+        </div>
+      ))}
+    </div>
+
+    {/* Right Side: Collapse Button */}
+    {viewMode === 'daywise' && (
+      <button
+        onClick={handleToggleAll}
+        style={{
+          fontSize: '11px', fontWeight: 700,
+          background: '#fff', border: '1px solid #e5e7eb',
+          borderRadius: '8px', 
+          padding: '5px 12px',
+          cursor: 'pointer', color: '#374151',
+          display: 'flex', alignItems: 'center', gap: '4px',
+        }}
+      >
+        {isAnyExpanded ? 'Collapse All ↑' : 'Expand All ↓'}
+      </button>
+    )}
+  </div>
+)}
        {planItems.length === 0 ? (
           /* Empty State */
           <div style={{ textAlign: 'center', padding: '64px 20px' }}>
@@ -697,22 +748,7 @@ const tripBaseline = baseDateStr ? new Date(baseDateStr + 'T00:00:00') : null;
           /* ══ NAYA DAY-WISE VIEW (Image 1 & 2 Style) ══ */
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
             {/* Expand / Collapse All Toggle */}
-            <button
-              onClick={handleToggleAll}
-              style={{
-                fontSize: '11px', fontWeight: 700,
-                background: '#fff', border: '1px solid #e5e7eb',
-                borderRadius: '8px', padding: '5px 12px',
-                cursor: 'pointer', color: '#374151',
-                display: 'flex', alignItems: 'center', gap: '4px',
-                alignSelf: 'flex-end', marginBottom: '10px',
-                transition: 'background 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-            >
-              {isAnyExpanded ? 'Collapse All ↑' : 'Expand All ↓'}
-            </button>
+           
     {sortedDayEntries.map(([rawDate, items], gi) => {
       const isCollapsed = collapsedDays[rawDate];
       let currentDayNum = gi + 1; // default fallback
@@ -758,7 +794,7 @@ if (rawDate !== 'No Date' && tripBaseline) {
           </div>
           {!isCollapsed && (
             <div style={{ padding: '16px', borderTop: '1.5px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fafafa' }}>
-              {items.map((item) => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} itemIndex={planItems.indexOf(item)} onReorder={reorderPlan} readOnlyPlan={readOnlyPlan} onUpdateItem={onUpdateItem} />)}
+              {items.map((item) => <PlanCard key={item.id} item={item} onRemove={removeFromPlan} itemIndex={planItems.indexOf(item)} onReorder={reorderPlan} readOnlyPlan={readOnlyPlan} onUpdateItem={onUpdateItem}  onMoveToTrip={onMoveToTrip} currentTripId={currentTripId} />)}
                 </div>
           )}
         </div>
@@ -821,6 +857,8 @@ if (rawDate !== 'No Date' && tripBaseline) {
                           onReorder={reorderPlan}
                           readOnlyPlan={readOnlyPlan}
                           onUpdateItem={onUpdateItem}
+                          onMoveToTrip={onMoveToTrip}
+
                           showCheckOut={true}
                         />
                       ))}
@@ -867,8 +905,31 @@ if (rawDate !== 'No Date' && tripBaseline) {
             {readOnlyPlan ? 'Book (locked)' : 'BOOK NOW'}
           </button>
           {/* 2. Trip Review Button — MIDDLE */}
+{/* 🎫 Voucher Button — BOOK NOW ke right side mein */}
+<button
+  type="button"
+  onClick={() => onShowVoucher?.()}
+  style={{
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '10px 16px',
+    background: '#fff',
+    color: '#1a1a1a',
+    border: '1.5px solid #e5e7eb',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: 800,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  }}
+  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgb(247,190,57)'; e.currentTarget.style.background = '#fffbeb'; }}
+  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#fff'; }}
+>
+  🎫 Voucher
+</button>
           <button
             type="button"
+
             onClick={onSendTripReview}
             disabled={!canSendTripReview || reviewSendLoading || readOnlyPlan}
             style={{
@@ -909,6 +970,99 @@ if (rawDate !== 'No Date' && tripBaseline) {
     </div> // Main div closing
   );
 }
+// ─── BudgetApprovalModal ──────────────────────────────────────────────────
+function BudgetApprovalModal({ 
+  open, 
+  onClose, 
+  managerName, 
+  grandTotal, 
+  onSend, 
+  loading 
+}) {
+  const [budget, setBudget] = useState(grandTotal || 0);
+  const [note, setNote] = useState('');
+
+  // Update budget if grandTotal changes while modal is open (initial load)
+  useEffect(() => {
+    if (open) setBudget(grandTotal);
+  }, [open, grandTotal]);
+
+  if (!open) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(2px)'
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fff', borderRadius: '16px', width: '400px', padding: '24px',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '20px'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>Set Budget</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9ca3af' }}>✕</button>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}>Approving Manager</label>
+          <div style={{ padding: '10px 12px', background: managerName ? '#f9fafb' : '#fff1f2', border: managerName ? '1px solid #e5e7eb' : '1px solid #fecaca', borderRadius: '8px', fontSize: '14px', fontWeight: 600, color: managerName ? '#111827' : '#991b1b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: managerName ? '#AFA9EC' : '#fecaca', color: managerName ? '#26215C' : '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700 }}>
+              {(managerName || 'M').charAt(0).toUpperCase()}
+            </div>
+            {managerName || 'No Manager Assigned'}
+          </div>
+          {!managerName && (
+            <div style={{ marginTop: '8px', padding: '8px', background: '#fff7ed', borderRadius: '8px', border: '1px solid #ffedd5' }}>
+             
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}>Requested Budget (INR)</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#6b7280' }}>₹</span>
+            <input 
+              type="number" 
+              value={budget} 
+              onChange={e => setBudget(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px 10px 24px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', fontWeight: 700, color: '#111827', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#9ca3af', display: 'flex', justifyContent: 'space-between' }}>
+            <span>Current plan total: <b>{fmt(grandTotal)}</b></span>
+            {budget > 0 && <span>{Math.round((grandTotal/budget)*100)}% utilized</span>}
+          </p>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '4px' }}>Add a Note (Optional)</label>
+          <textarea 
+            value={note} 
+            onChange={e => setNote(e.target.value)}
+            placeholder="Explain why you need this budget..."
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', minHeight: '80px', resize: 'none', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+          />
+        </div>
+
+        <button 
+          onClick={() => onSend(budget, note)}
+          disabled={loading || !managerName || budget <= 0}
+          style={{ 
+            background: 'rgb(247,190,57)', color: '#1a1a1a', border: 'none', borderRadius: '10px', 
+            padding: '14px', fontSize: '14px', fontWeight: 800, cursor: (loading || !managerName || budget <= 0) ? 'not-allowed' : 'pointer',
+            opacity: (loading || !managerName || budget <= 0) ? 0.6 : 1,
+            transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(247,190,57,0.25)'
+          }}
+        >
+          {loading ? 'Sending Request...' : 'Send for Approval'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── ResizerHandle (Isse hamesha component ke bahar rakho) ───
 function ResizerHandle({ onMouseDown, visible = true }) {
   const [hovered, setHovered] = useState(false);
@@ -944,19 +1098,14 @@ function ResizerHandle({ onMouseDown, visible = true }) {
 }
 // ─── Main DetailPage ───────────────────────────────────────────────────────────
 export default function DetailPage({ rfq: initialRfq, onBack, onUpdate, initialPlan = [] }) {
-  const [rfq,           setRfq]           = useState(() => {
-    try {
-      const savedRfq = localStorage.getItem('current_rfq_' + (initialRfq?._id || 'default'));
-      if (savedRfq) return JSON.parse(savedRfq);
-    } catch {}
-    return initialRfq;
-  });
+  const [rfq,           setRfq]           = useState(initialRfq);
   const [isEditingName, setIsEditingName] = useState(false);
-const [tempTripName, setTempTripName] = useState(rfq.tripName || '');
+const [tempTripName, setTempTripName] = useState(rfq?.tripName || '');
   const [profile,       setProfile]       = useState({ fullName:'', phone:'', passport:'', budget:'', reviewer:'' });
   const [showTpForm,    setShowTpForm]    = useState(false);
   const [showDetails,   setShowDetails]   = useState(false);
   const [showBookView,  setShowBookView]  = useState(false);
+  const [showVoucher, setShowVoucher] = useState(false);
   const [showBudgetToast, setShowBudgetToast] = useState(true);
   const [viewMode,      setViewMode]      = useState('itemwise');
   const [activeFilter,  setActiveFilter]  = useState('flights');
@@ -964,6 +1113,8 @@ const [tempTripName, setTempTripName] = useState(rfq.tripName || '');
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [reviewSendLoading, setReviewSendLoading] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false); 
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
 
   // ── Homepage se profile name load karne ke liye ──
@@ -976,6 +1127,16 @@ const [tempTripName, setTempTripName] = useState(rfq.tripName || '');
         console.error("Error parsing profile", e);
       }
     }
+
+    const fetchUserProfile = async () => {
+      try {
+        const res = await axios.get('/api/users/profile');
+        if (res.data?.success) setUserProfile(res.data.data);
+      } catch (err) {
+        console.error("Error fetching user profile", err);
+      }
+    };
+    fetchUserProfile();
   }, []);
   // ── Genie / Chat panel state ──
   const [chatOpen, setChatOpen] = useState(true);
@@ -1037,7 +1198,20 @@ const [tempTripName, setTempTripName] = useState(rfq.tripName || '');
     document.addEventListener('mouseup',   onMouseUp);
   }, [leftWidth, rightWidth]);
 
-  const handleSaveProfile = (p) => { localStorage.setItem('tp_profile', JSON.stringify(p)); setProfile(p); };
+  const handleSaveProfile = async (p) => { 
+    localStorage.setItem('tp_profile', JSON.stringify(p)); 
+    setProfile(p); 
+    try {
+      const res = await axios.patch('/api/users/profile', p);
+      if (res.data?.success) {
+        // Refresh local userProfile to get updated managerName/Uid
+        const profileRes = await axios.get('/api/users/profile');
+        if (profileRes.data?.success) setUserProfile(profileRes.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to sync profile with backend", err);
+    }
+  };
   // ✅ SAHI — DetailPage ke andar, handleSaveProfile ke paas
 useEffect(() => {
   if (!rfq?._id) return;
@@ -1061,9 +1235,6 @@ useEffect(() => {
         if (res.data?.success && res.data.data?.reviewStatus === 'approved') {
           const d = res.data.data;
           setRfq(d);
-          try {
-            localStorage.setItem('current_rfq_' + (d._id || 'default'), JSON.stringify(d));
-          } catch {}
           if (onUpdate) onUpdate(d);
         }
       } catch { /* ignore */ }
@@ -1073,23 +1244,60 @@ useEffect(() => {
     return () => clearInterval(iv);
   }, [rfq?._id, rfq.reviewStatus]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('current_rfq_' + (rfq?._id || 'default'), JSON.stringify(rfq));
-    } catch {}
-  }, [rfq]);
-
-  const planKeyRef = useRef('plan_' + (initialRfq?._id || 'default'));
-
   const [planItems, setPlanItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('plan_' + (initialRfq?._id || 'default'));
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+    return Array.isArray(initialRfq?.planItems) ? initialRfq.planItems : [];
   });
 
+  // Re-fetch latest data on mount to prevent stale state overwrites
+  useEffect(() => {
+    if (!initialRfq?._id) return;
+    const loadLatest = async () => {
+      try {
+        const res = await axios.get(`/api/rfqs/${initialRfq._id}`);
+        if (res.data?.success && res.data.data) {
+          const latest = res.data.data;
+          console.log(`[DetailPage] Re-fetched latest data for ${latest._id}. Items: ${latest.planItems?.length || 0}`);
+          setRfq(latest);
+          if (Array.isArray(latest.planItems)) {
+            setPlanItems(latest.planItems);
+          }
+          if (onUpdate) onUpdate(latest);
+        }
+      } catch (err) {
+        console.error("Failed to re-fetch rfq on mount:", err);
+      }
+    };
+    loadLatest();
+  }, [initialRfq?._id]); // Only runs when trip ID changes
+
+  // Effect to sync planItems with backend (optional: debounce for performance)
+  useEffect(() => {
+    if (!rfq?._id || rfq.reviewStatus === 'approved') return;
+    
+    // Using a timeout to debounce database updates
+    const timer = setTimeout(async () => {
+      try {
+        console.log(`[DetailPage] Syncing ${planItems.length} items to DB for RFQ ${rfq._id}`);
+        const res = await axios.put(`/api/rfqs/${rfq._id}`, { planItems });
+        if (res.data?.success && res.data.data) {
+          const updatedRfq = res.data.data;
+          console.log(`[DetailPage] Sync successful. Updated RFQ has ${updatedRfq.planItems?.length || 0} items`);
+          setRfq(updatedRfq);
+          if (onUpdate) {
+            console.log(`[DetailPage] Calling onUpdate with updated RFQ`);
+            onUpdate(updatedRfq);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sync planItems to DB", err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [planItems, rfq?._id, rfq.reviewStatus, onUpdate]);
+
   const saveItems = (items) => {
-    try { localStorage.setItem(planKeyRef.current, JSON.stringify(items)); } catch {}
+    // No longer using localStorage
   };
 
   // 1. Extract Base Data & Dates (Defined at the top to fix ReferenceError)
@@ -1253,6 +1461,78 @@ const reorderPlan = (fromIdx, toIdx) => {
     return next;
   });
   };
+
+  const handleMoveToTrip = async (item, targetTrip) => {
+  try {
+    // 1. Target trip fetch karo aur response structure console mein dekho
+    const res = await axios.get(`/api/rfqs/${targetTrip._id}`);
+    console.log('Full target trip response:', JSON.stringify(res.data, null, 2));
+    
+    // 2. Safe fallback with multiple possible response structures
+    const targetData = res.data?.data || res.data;
+    const targetPlanItems = targetData?.planItems || [];
+    
+    console.log('Target planItems found:', targetPlanItems.length);
+
+    // 3. Duplicate check
+    if (targetPlanItems.find(p => p.id === item.id)) {
+      alert('This item already exists in the selected trip!');
+      return;
+    }
+
+    // 4. Clean item - hotel continuation markers hata do
+    const cleanItem = { ...item };
+    delete cleanItem._isHotelContinuation;
+    delete cleanItem._nightNumber;
+    delete cleanItem._totalNights;
+    
+    // 5. New unique ID assign karo target trip ke liye
+    cleanItem.id = `${item.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const newPlanItems = [...targetPlanItems, { ...cleanItem, status: 'pending' }];
+    
+    console.log('Sending to target trip:', newPlanItems.length, 'items');
+
+    // 6. Target trip update karo
+    const updateRes = await axios.put(`/api/rfqs/${targetTrip._id}`, {
+      planItems: newPlanItems,
+    });
+    
+    console.log('Update response:', JSON.stringify(updateRes.data, null, 2));
+
+    // 7. Verify save hua ya nahi
+    if (!updateRes.data?.success) {
+      throw new Error(updateRes.data?.message || 'Update failed - no success flag');
+    }
+
+    // 8. Verify karo - target trip dobara fetch karke check karo
+    const verifyRes = await axios.get(`/api/rfqs/${targetTrip._id}`);
+    const verifyData = verifyRes.data?.data || verifyRes.data;
+    const verifyItems = verifyData?.planItems || [];
+    
+    console.log('Verification - items in target trip after update:', verifyItems.length);
+    
+    if (!verifyItems.find(p => p.id === cleanItem.id)) {
+      throw new Error('Item was not saved in target trip - verification failed');
+    }
+
+    // 9. Update global state for target trip (App.itineraries update)
+    if (onUpdate && updateRes.data?.data) {
+      onUpdate(updateRes.data.data);
+    }
+
+    // 10. Current trip se remove karo (sirf verify ke baad)
+    removeFromPlan(item.id);
+
+    alert(`Item moved to "${targetTrip.tripName}" successfully! (Verified: ${verifyItems.length} items)`);
+    
+  } catch (err) {
+    console.error('Move failed:', err);
+    console.error('Error response data:', err.response?.data);
+    console.error('Error status:', err.response?.status);
+    alert('Move failed: ' + (err.response?.data?.message || err.message));
+  }
+};
   const updatePlanItem = (id, updates) => {
     setPlanItems(prev => {
       const next = prev.map(p => p.id === id ? { ...p, ...updates } : p);
@@ -1278,9 +1558,6 @@ const reorderPlan = (fromIdx, toIdx) => {
 
   const handleRfqUpdate = (u) => {
     setRfq(u);
-    try {
-      localStorage.setItem('current_rfq_' + (u._id || 'default'), JSON.stringify(u));
-    } catch {}
     if (onUpdate) onUpdate(u);
   };
   const handleUpdateTripName = async () => {
@@ -1332,6 +1609,39 @@ const reorderPlan = (fromIdx, toIdx) => {
       window.alert(e.response?.data?.message || e.message || 'Error');
     } finally {
       setReviewSendLoading(false);
+    }
+  };
+
+  const handleSendBudgetApproval = async (requestedBudget, userNote) => {
+    if (planFrozen || approvalLoading) return;
+    setApprovalLoading(true);
+    console.log('[BudgetApproval] Sending with:', { 
+      managerName: userProfile?.managerName, 
+      managerUid: userProfile?.managerUid 
+    });
+    try {
+      await axios.post('/api/budget-approvals', {
+        tripId: rfq._id,
+        rfqId: (rfq.rfqId && String(rfq.rfqId).trim()) || '',
+        tripName: rfq.tripName || 'My Trip',
+        requestedBy: 'user',
+        assignedTo: userProfile?.managerUid || '',
+        budget: Number(requestedBudget) || 0,
+        grandTotal,
+        planItems,
+        destinations: rfq.destinations || [],
+        numberOfAdults: rfq.numberOfAdults || 1,
+        numberOfChildren: rfq.numberOfChildren || 0,
+        numberOfInfants: rfq.numberOfInfants || 0,
+        userNote
+      });
+      const res = await axios.get(`/api/budget-approvals/${rfq._id}`);
+      if (res.data?.success) setApprovalStatus(res.data.data);
+      setShowBudgetModal(false);
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setApprovalLoading(false);
     }
   };
 
@@ -1556,33 +1866,11 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
     <button
       type="button"
       disabled={planFrozen || approvalLoading}
-      onClick={async () => {
-        if (planFrozen || approvalLoading) return;
-        setApprovalLoading(true);
-        try {
-          await axios.post('/api/budget-approvals', {
-            tripId: rfq._id,
-            rfqId: (rfq.rfqId && String(rfq.rfqId).trim()) || '',
-            tripName: rfq.tripName || 'My Trip',
-            requestedBy: 'user',
-            budget: Number(activeBudget) || 0,
-            grandTotal,
-            planItems,
-            destinations: rfq.destinations || [],
-            numberOfAdults: rfq.numberOfAdults || 1,
-            numberOfChildren: rfq.numberOfChildren || 0,
-            numberOfInfants: rfq.numberOfInfants || 0,
-          });
-          const res = await axios.get(`/api/budget-approvals/${rfq._id}`);
-          if (res.data?.success) setApprovalStatus(res.data.data);
-        } catch (err) {
-          alert('Error: ' + (err.response?.data?.message || err.message));
-        } finally { setApprovalLoading(false); }
-      }}
+      onClick={() => setShowBudgetModal(true)}
       style={{ display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'8px', background: planFrozen ? '#f3f4f6' : '#fff', border:'1px solid rgb(247,190,57)', cursor: planFrozen || approvalLoading ? 'not-allowed' : 'pointer', fontSize:'11px', fontWeight:700, color: planFrozen ? '#9ca3af' : 'rgb(180,130,0)', whiteSpace:'nowrap', opacity: planFrozen ? 0.7 : 1 }}
     >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-      {approvalLoading ? 'Sending...' : 'Send for approval'}
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 21v-8m4 8v-5M8 21v-3"/></svg>
+      Set Budget
     </button>
   )}
 
@@ -1626,6 +1914,16 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
     onClose={() => setShowDetails(false)}
   />
 )}
+
+{/* Budget Modal */}
+<BudgetApprovalModal
+  open={showBudgetModal}
+  onClose={() => setShowBudgetModal(false)}
+  managerName={userProfile?.managerName}
+  grandTotal={grandTotal}
+  onSend={handleSendBudgetApproval}
+  loading={approvalLoading}
+/>
       {/* ══════════════════════════════════════════════
           Responsive Layout
       ══════════════════════════════════════════════ */}
@@ -1716,6 +2014,9 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                   tripReviewStatus={rfq.reviewStatus || 'draft'}
                   onViewAttachments={() => setShowAttachments(true)}
                   onUpdateItem={updatePlanItem}
+                  onMoveToTrip={handleMoveToTrip}
+                   currentTripId={rfq._id}  
+                   onShowVoucher={() => setShowVoucher(true)} 
                 />
               )}
             </div>
@@ -1790,6 +2091,7 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                     tripReviewStatus={rfq.reviewStatus || 'draft'}
                      onViewAttachments={() => setShowAttachments(true)}  // ✅ ADD (agar nahi hai)
   onUpdateItem={updatePlanItem}      
+  onMoveToTrip={handleMoveToTrip}
                   />
                 )}
               </div>
@@ -1825,6 +2127,12 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
           onClose={() => setShowAttachments(false)}
         />
       )}
-    </div>
+      <TripVoucherModal
+      open={showVoucher}
+      onClose={() => setShowVoucher(false)}
+      rfq={rfq}
+      planItems={planItems}
+      userName={userProfile?.name || profile?.fullName}
+      />    </div>
   );
 }

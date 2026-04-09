@@ -263,6 +263,13 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
 
   const [toCity, setToCity] = useState(selectedDestData?.destination || '');
   
+  const handleSwap = (e) => {
+    e.stopPropagation();
+    const temp = fromCity;
+    setFromCity(toCity);
+    setToCity(temp);
+  };
+
   // Update toCity when selectedDest changes
   useEffect(() => {
     if (selectedDestData?.destination) {
@@ -400,16 +407,55 @@ const handleAdd = (flight) => {
             ))}
           </div>
 
-          {/* FROM */}
-          <div style={{marginBottom:'8px'}}>
-            <div style={lbl}>From</div>
-            <div style={inputBox}><span style={{color:'#F7BE39'}}>✈</span><CityInput value={fromCity} onChange={setFromCity} placeholder="Departure city" id="flights_from_city" /></div>
-          </div>
+          {/* FROM / TO with Swap */}
+          <div style={{ position:'relative', display:'flex', flexDirection:'column' }}>
+            {/* FROM */}
+            <div style={{ marginBottom: '8px' }}>
+              <div style={lbl}>From</div>
+              <div style={inputBox}><span style={{color:'#F7BE39'}}>✈</span><CityInput value={fromCity} onChange={setFromCity} placeholder="Departure city" id="flights_from_city" /></div>
+            </div>
 
-          {/* TO */}
-          <div style={{marginBottom:'8px'}}>
-            <div style={lbl}>To</div>
-            <div style={inputBox}><span>🏙️</span><CityInput value={toCity} onChange={setToCity} placeholder="Arrival city" id="flights_to_city" /></div>
+            {/* SWAP BUTTON */}
+             <button 
+    onClick={handleSwap}
+    style={{
+      position:'absolute', 
+      right:'20px',           /* Right se thoda andar */
+      top:'54px',             /* From label + input height ke hisaab se manually set kiya */
+      zIndex:100, 
+      width:'28px', 
+      height:'28px', 
+      borderRadius:'50%', 
+      background:'#fff',
+      border:'1px solid #e5e7eb', 
+      color:'#F7BE39', 
+      cursor:'pointer',
+      display:'flex', 
+      alignItems:'center', 
+      justifyContent: 'center', 
+      fontSize:'16px', 
+      fontWeight:700,
+      boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
+      transition: 'all 0.2s'
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.borderColor = '#F7BE39';
+      e.currentTarget.style.transform = 'scale(1.1)';
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = '#e5e7eb';
+      e.currentTarget.style.transform = 'scale(1)';
+    }}
+    title="Swap From/To"
+  >
+    ⇄
+  </button>
+
+            {/* TO */}
+            <div style={{ marginBottom:'8px' }}>
+              <div style={lbl}>To</div>
+              <div style={inputBox}><span>🏙️</span><CityInput value={toCity} onChange={setToCity} placeholder="Arrival city" id="flights_to_city" /></div>
+            </div>
           </div>
 
           {/* DATE + PAX */}

@@ -1,5 +1,5 @@
 // src/components/shared/PlanCard.jsx
-import { useState } from 'react';
+import { useState ,useEffect, useRef  } from 'react';
 
 // ─── Policy Shield Icons ───────────────────────────────────────────────────────
 const ShieldCheck = ({ size = 18 }) => (
@@ -236,8 +236,268 @@ function ItemDetailModal({ item, onClose }) {
   );
 }
 
+// 1. Accept currentTripId as a prop
+function MoveToTripBody({ itemName, onMove, currentTripId }) {
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [error, setError] = useState(null); // Add error state
+
+  useEffect(() => {
+    // Use axios instead of fetch (it carries interceptors/auth headers)
+    import('axios').then(({ default: axios }) => {
+      axios.get('/api/rfqs')
+        .then(res => {
+          const all = res.data?.data || [];
+          // Filter out the current trip
+          setTrips(all.filter(t => t._id !== currentTripId));
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to load trips:', err);
+          setError('Could not load trips. Please try again.');
+          setLoading(false);
+        });
+    });
+  }, [currentTripId]);
+
+  const DEST_IMAGES = {
+    dubai:   'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=300&q=80',
+    london:  'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=300&q=80',
+    paris:   'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300&q=80',
+    default: 'https://images.unsplash.com/photo-1488085061387-422e29b40080?w=300&q=80',
+  };
+
+  const getImg = (rfq) => {
+    const dest = (rfq.destinations?.[0]?.destination || '').toLowerCase();
+    for (const [k, v] of Object.entries(DEST_IMAGES)) {
+      if (dest.includes(k)) return v;
+    }
+    return DEST_IMAGES.default;
+  };
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>
+        Select a trip to move into
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '30px', color: '#9ca3af' }}>Loading trips…</div>
+      ) : trips.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '30px', color: '#9ca3af' }}>No other trips found.</div>
+      ) : (
+        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+          {trips.map(t => (
+            <div
+              key={t._id}
+              onClick={() => setSelected(prev => prev === t._id ? null : t._id)}
+              style={{
+                flexShrink: 0, width: '170px', borderRadius: '14px', overflow: 'hidden', cursor: 'pointer',
+                border: selected === t._id ? '2.5px solid rgb(247,190,57)' : '2px solid #e5e7eb',
+                boxShadow: selected === t._id ? '0 4px 16px rgba(247,190,57,0.3)' : '0 2px 6px rgba(0,0,0,0.06)',
+                transition: 'all 0.15s',
+                position: 'relative',
+              }}
+            >
+              {/* Check badge */}
+              {selected === t._id && (
+                <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, width: '20px', height: '20px', borderRadius: '50%', background: 'rgb(247,190,57)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              )}
+              <img src={getImg(t)} alt="" style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} onError={e => e.target.src = DEST_IMAGES.default} />
+              <div style={{ padding: '10px 10px 12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.tripName || 'Untitled Trip'}</div>
+                <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {t.destinations?.[0]?.destination || 'Unknown'}</div>
+                <div style={{ fontSize: '9px', fontWeight: 700, marginTop: '6px', padding: '2px 6px', borderRadius: '4px', background: '#f3f4f6', color: '#6b7280', display: 'inline-block' }}>
+                  {t.planItems?.length || 0} items
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Confirm button */}
+      <button
+        onClick={() => { if (selected) onMove(trips.find(t => t._id === selected)); }}
+        disabled={!selected}
+        style={{
+          marginTop: '16px', width: '100%', padding: '11px',
+          background: selected ? 'rgb(247,190,57)' : '#f3f4f6',
+          color: selected ? '#1a1a1a' : '#9ca3af',
+          border: 'none', borderRadius: '12px',
+          fontSize: '13px', fontWeight: 900,
+          cursor: selected ? 'pointer' : 'not-allowed',
+          transition: 'all 0.15s',
+        }}
+      >
+        {selected ? `Move to "${trips.find(t => t._id === selected)?.tripName || 'Selected Trip'}" →` : 'Select a trip above'}
+      </button>
+    </div>
+  );
+}
+function ThreeDotMenu({ onRemove,onMoveToTrip, itemName , currentTripId ,item ,status}) {
+  const [open, setOpen] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.right + window.scrollX - 180, // right-align
+      });
+    }
+    setOpen(v => !v);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* 3-dot button — HORIZONTAL */}
+      <button
+        ref={btnRef}
+        onClick={handleOpen}
+        style={{
+          border: 'none', background: open ? '#f3f4f6' : 'transparent',
+          width: '26px', height: '26px', borderRadius: '50%',
+          cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: '#6b7280',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent'; }}
+        title="More options"
+      >
+        {/* HORIZONTAL 3 dots */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="5" cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="19" cy="12" r="2"/>
+        </svg>
+      </button>
+
+      {/* Dropdown — fixed positioning to avoid overflow */}
+      {open && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: menuPos.top,
+            left: menuPos.left,
+            zIndex: 99999,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            padding: '6px',
+            minWidth: '180px',
+          }}
+        >
+          {/* Move to another trip */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+             setShowMoveModal(true);
+            }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '8px 10px', borderRadius: '8px', border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              fontSize: '12px', fontWeight: 600, color: '#374151',
+              textAlign: 'left',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            Move to another trip
+          </button>
+
+          {/* Divider & Delete - Only show if not paid */}
+          {status !== 'paid' && (
+            <>
+              <div style={{ height: '1px', background: '#f3f4f6', margin: '4px 0' }} />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  onRemove();
+                }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 10px', borderRadius: '8px', border: 'none',
+                  background: 'transparent', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: 600, color: '#dc2626',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                Delete item
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {showMoveModal && (
+  <div
+    onClick={() => setShowMoveModal(false)}
+    style={{
+      position: 'fixed', inset: 0, zIndex: 99999,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
+    }}
+  >
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        background: '#fff', borderRadius: '20px',
+        width: '100%', maxWidth: '640px',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div style={{ background: 'rgb(247,190,57)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a1a' }}>Move to Another Trip</div>
+          <div style={{ fontSize: '11px', color: 'rgba(26,26,26,0.65)', marginTop: '2px' }}>{itemName}</div>
+        </div>
+        <button onClick={() => setShowMoveModal(false)} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(0,0,0,0.12)', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>×</button>
+      </div>
+
+      {/* Body */}
+      <MoveToTripBody itemName={itemName} onMove={(targetTrip) => { setShowMoveModal(false); onMoveToTrip && onMoveToTrip(item,targetTrip); }} />
+    </div>
+  </div>
+)}
+    </div>
+  );
+}
+
 // ─── PlanCard (Main Component) ────────────────────────────────────────────────
-export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnlyPlan = false, onUpdateItem, showCheckOut = false }) {
+export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnlyPlan = false, onUpdateItem, showCheckOut = false, onMoveToTrip, currentTripId }) {
   const [imgErr,      setImgErr]      = useState(false);
   const [showDetail,  setShowDetail]  = useState(false);
   const [showNotes,   setShowNotes]   = useState(false);
@@ -306,11 +566,10 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
             <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
               {item.type === 'other' ? (status === 'paid' ? 'PAID' : 'UNPAID') : status}
             </span>
-            {!readOnlyPlan && status !== 'paid' && (
-              <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TrashIcon />
-              </button>
-            )}
+          {!readOnlyPlan && (
+ <ThreeDotMenu onRemove={() => onRemove(item.id)} itemName={titleText} onMoveToTrip={onMoveToTrip}  currentTripId={currentTripId}    item={item} status={status}/>
+)}
+
           </div>
           <div style={{ fontSize: '15px', fontWeight: 900, color: '#111827' }}>{fmt(item.price || 0)}</div>
         </div>
@@ -392,7 +651,7 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
                     /* Regular Status Tags (used for day-wise or non-hotel items) */
                     item.type === 'hotel' && !showCheckOut && (
                       <>
-                        {!item._isHotelContinuation ? (
+                        {item._isCheckIn ? (
                           <>
                             <span style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', marginLeft: '6px' }}>
                               CHECK-IN
@@ -404,13 +663,14 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
                               1/{item._totalNights || 1}N
                             </span>
                           </>
+                        ) : item._isCheckOut ? (
+                          <>
+                            <span style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', marginLeft: '6px' }}>
+                              CHECK-OUT
+                            </span>
+                          </>
                         ) : (
                           <>
-                            {item._nightNumber === item._totalNights && (
-                              <span style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', marginLeft: '6px' }}>
-                                CHECK-OUT
-                              </span>
-                            )}
                             <span style={{ 
                               background: '#eff6ff', color: '#1e40af', border: '1px solid #dbeafe',
                               fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', marginLeft: '6px'
@@ -438,11 +698,9 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
                   <span style={{ fontSize: '9px', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', background: status === 'paid' ? '#dcfce7' : '#fef3c7', color: status === 'paid' ? '#16a34a' : '#92400e', textTransform: 'uppercase' }}>
                     {status === 'paid' ? 'PAID' : 'PENDING'}
                   </span>
-                  {!readOnlyPlan && status !== 'paid' && (
-                    <button onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <TrashIcon />
-                    </button>
-                  )}
+             {!readOnlyPlan && (
+ <ThreeDotMenu onRemove={() => onRemove(item.id)} itemName={titleText} onMoveToTrip={onMoveToTrip}  currentTripId={currentTripId} item={item} status={status} />
+)}
                 </div>
                 <div style={{ fontSize: '15px', fontWeight: 900, color: '#111827' }}>
                   {item.price ? fmt(item.price) : ''}
@@ -454,10 +712,18 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
 
         {/* Notes Bar */}
         <div onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }} style={{ background: '#f8fafc', padding: '5px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: '13px', color: noteText ? '#334155' : '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{noteText || "Add notes"}</div>
+          <div style={{ fontSize: '13px', color: noteText ? '#334155' : '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {noteText || "Add notes"}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.8 }}>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </div>
           <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ color: '#e2e8f0' }}>|</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
             Attachment({attachments.length})
           </div>
         </div>
@@ -466,6 +732,21 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
       {/* Notes Panel */}
       {showNotes && (
         <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '16px', zIndex: 10, position: 'relative' }}>
+          {/* Close Icon */}
+          <button 
+            onClick={() => setShowNotes(false)}
+            style={{ 
+              position: 'absolute', top: '10px', right: '10px', 
+              background: 'none', border: 'none', cursor: 'pointer', 
+              padding: '4px', color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+
           <textarea
             value={noteText}
             onChange={e => setNoteText(e.target.value)}

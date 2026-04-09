@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useAuth } from '../role-auth/role-auth/src/context/AuthContext';
 import ManagerApprovalsSection from '../components/ManagerPanel';
 import HeaderProfileMenu from '../components/detail/headings/HeaderProfileMenu';
+import TripsPage from '../components/detail/headings/TripsPage'
 
 // ─── TP Profile Form Popup ────────────────────────────────────────────────────
 function TpProfilePopup({ onClose }) {
@@ -96,8 +97,16 @@ export default function HomePage({
   onOpenItinerary,
   onDeleteItinerary,
   onAddToPlan,
+    onMerge, 
   currentUser,
   onOpenHRDashboard,
+  onOpenAdminDashboard,
+  showTripsPage,
+  setShowTripsPage,
+  undoVisible,
+  setUndoVisible,
+  lastMergedId,
+  setLastMergedId
 }) {
   const { user, logout } = useAuth();
   const isManager = user?.role === 'manager';
@@ -139,10 +148,10 @@ export default function HomePage({
       }
     };
 
-    // 1. तुरंत लोड करें
+    
     fetchData(true);
 
-    // 2. हर 5 सेकंड में बैकग्राउंड में नया डेटा चेक करें
+    
     const syncInterval = setInterval(() => {
       fetchData(false);
     }, 5000); 
@@ -208,6 +217,18 @@ export default function HomePage({
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-gray-900">
 
+{showTripsPage && (
+  <TripsPage
+    onClose={() => setShowTripsPage(false)}
+    itineraries={itineraries}
+    onOpen={onOpenItinerary}
+    onMerge={onMerge}
+    undoVisible={undoVisible}
+    setUndoVisible={setUndoVisible}
+    lastMergedId={lastMergedId}
+    setLastMergedId={setLastMergedId}
+  />
+)}
       {/* ── HEADER ── */}
       <header className="w-full z-30 sticky top-0" style={{ backgroundColor: 'rgb(247, 190, 57)' }}>
         <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
@@ -217,10 +238,27 @@ export default function HomePage({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           
       
+      {/* My Trips button */}
+<button
+  onClick={() => setShowTripsPage(true)}
+  style={{
+    background: '#fff',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '7px 14px',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#1a1a1a',
+    cursor: 'pointer',
+  }}
+>
+  My Trips
+</button>
             <HeaderProfileMenu
   user={user}
   onLogout={logout}
   onOpenHRDashboard={onOpenHRDashboard}
+onOpenAdminDashboard={onOpenAdminDashboard}  
   activeProfile={activeProfile}        // 'business' ya 'personal' — apna state manage karo
   onSwitchProfile={(type) => setActiveProfile(type)}
 />

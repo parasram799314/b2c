@@ -15,6 +15,10 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
+function generateStandardId() {
+  return Date.now().toString(36).toUpperCase().slice(-6);
+}
+
 function toYMD(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -127,9 +131,13 @@ router.post('/', verifyToken, async (req, res) => {
   try {
     // _id aur __v frontend se aa sakta hai — strip karo warna Mongoose crash karega
     const createdBy = req.uid;
-const userDoc = await User.findOne({ uid: req.uid });
-const assignedTo = userDoc?.managerId || '';
+    const userDoc = await User.findOne({ uid: req.uid });
+    const assignedTo = userDoc?.managerId || '';
     const { _id, __v, ...rfqData } = req.body;
+    
+    // Ensure rfqId is present (backend generated if missing)
+    const finalRfqId = rfqData.rfqId || generateStandardId();
+
     console.log('[rfqs] Creating RFQ, destination:', rfqData.destinations?.[0]?.destination);
 
     const [
@@ -150,10 +158,11 @@ const assignedTo = userDoc?.managerId || '';
 
     const rfq = new RFQ({
       ...rfqData,
+      rfqId: finalRfqId,
       createdBy,
 assignedTo,
       requireHotels: true, // ✅ FIX: DB mein bhi true save karo
-      itinerary,
+      itinerary: `Trip ID: ${finalRfqId}\n\n` + itinerary,
       travelType,
       modeOfTransport,
       destinationData,
@@ -178,6 +187,93 @@ const TOKENS_PER_CHAR_OUT = 0.25;
 
 // routes/rfqs.js mein /chat route ko pura replace karein:
 // routes/rfqs.js mein /chat route ko pura replace karein:
+// ── POST /api/rfqs/merge ──────────────────────────────────────────────────
+router.post('/merge', verifyToken, async (req, res) => {
+  try {
+    const { rfqIds, mergedTripName, deleteOriginals } = req.body;
+    if (!rfqIds || rfqIds.length < 2) {
+      return res.status(400).json({ success: false, message: 'At least 2 trips required to merge' });
+    }
+
+    // Fetch all source RFQs
+    const sourceRFQs = await RFQ.find({ _id: { $in: rfqIds } });
+    if (sourceRFQs.length !== rfqIds.length) {
+      return res.status(404).json({ success: false, message: 'One or more trips not found' });
+    }
+
+    // ── Day-wise merge logic ─────────────────────────────────────────────
+    // Collect all destinations in order
+    const mergedDestinations = [];
+    const mergedDestinationData = [];
+    const mergedPlanItems = [];
+    let dayOffset = 0;
+
+    sourceRFQs.forEach(rfq => {
+      // destinations re-numbering not strictly needed but destinations themselves are
+      (rfq.destinations || []).forEach(dest => {
+        mergedDestinations.push({ ...dest.toObject() });
+      });
+      (rfq.destinationData || []).forEach(dd => {
+        mergedDestinationData.push({ ...dd.toObject() });
+      });
+      // Re-number planItems day numbers with offset
+      (rfq.planItems || []).forEach(item => {
+        const cloned = { ...item };
+        if (cloned.day != null) cloned.day = Number(cloned.day) + dayOffset;
+        mergedPlanItems.push(cloned);
+      });
+      const nights = (rfq.destinations || []).reduce((s, d) => s + (d.numberOfNights || 0), 0);
+      dayOffset += nights;
+    });
+
+    // Build merged RFQ document
+    const firstRfq = sourceRFQs[0];
+    const generatedRfqId = generateStandardId();
+
+    // Merge itinerary text
+    const mergedItinerary = `Trip ID: ${generatedRfqId}\n\n` + sourceRFQs
+      .map((rfq, i) => `=== Trip ${i + 1}: ${rfq.tripName || rfq.destinations?.[0]?.destination || 'Trip'} ===\n${rfq.itinerary || ''}`)
+      .join('\n\n');
+
+    const newRfq = new RFQ({
+      rfqId:           generatedRfqId,
+      tripName:        mergedTripName || `Merged Trip (${sourceRFQs.map(r => r.tripName || r.destinations?.[0]?.destination || 'Trip').join(' + ')})`,
+      destinations:    mergedDestinations,
+      destinationData: mergedDestinationData,
+      planItems:       mergedPlanItems,
+      itinerary:       mergedItinerary,
+      requireHotels:   true,
+      guestCountry:    firstRfq.guestCountry || 'India',
+      numberOfAdults:  firstRfq.numberOfAdults || 1,
+      numberOfChildren:firstRfq.numberOfChildren || 0,
+      travelType:      firstRfq.travelType || '',
+      modeOfTransport: firstRfq.modeOfTransport || '',
+      weather:         firstRfq.weather || null,
+      checklist:       firstRfq.checklist || [],
+      checklistStats:  firstRfq.checklistStats || {},
+      createdBy:       req.uid,
+      reviewStatus:    'draft',
+      isMerged:        true,
+      mergedFrom:      rfqIds,
+    });
+
+    await newRfq.save();
+
+    // Delete originals if requested
+    if (deleteOriginals) {
+      await RFQ.deleteMany({ _id: { $in: rfqIds } });
+    }
+
+    res.status(201).json({ 
+      success: true, 
+      data: newRfq,
+      originalsDeleted: !!deleteOriginals 
+    });
+  } catch (err) {
+    console.error('[rfqs/merge] error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 router.post('/chat', verifyToken, async (req, res) => {
   try {
     const { itinerary, destinations, message } = req.body;
@@ -292,12 +388,17 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     const { pendingTripReview, reviewStatus } = req.query;
     const filter = {};
-    const currentUser = await User.findOne({ uid: req.uid });
-    if (currentUser?.role === 'manager' || currentUser?.role === 'hr') {
-      filter.assignedTo = req.uid;
-    } else {
-      filter.createdBy = req.uid;
-    }
+   const currentUser = await User.findOne({ uid: req.uid });
+if (currentUser?.role === 'manager' || currentUser?.role === 'hr') {
+  // Manager/HR ko khud ki banai trips + assigned trips jo 'sent' status mein hain
+  filter.$or = [
+    { createdBy: req.uid },
+    { assignedTo: req.uid, reviewStatus: 'sent' }
+  ];
+} else {
+  // Employee ko sirf apni trips
+  filter.createdBy = req.uid;
+}
     
     if (pendingTripReview === 'true') {
       filter.reviewStatus = 'sent';
@@ -449,7 +550,9 @@ router.post('/:id/regenerate', async (req, res) => {
       requireHotels: true, // ✅ FIX: regenerate mein bhi hamesha true
     });
 
-    rfq.itinerary       = itinerary;
+    const finalRfqId = rfq.rfqId || generateStandardId();
+    rfq.rfqId           = finalRfqId;
+    rfq.itinerary       = `Trip ID: ${finalRfqId}\n\n` + itinerary;
     rfq.travelType      = travelType;
     rfq.modeOfTransport = modeOfTransport;
     rfq.destinationData = destinationData;

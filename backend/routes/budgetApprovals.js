@@ -11,12 +11,12 @@ const router = express.Router();
 router.post('/', verifyToken, async (req, res) => {
   try {
     const userDoc = await User.findOne({ uid: req.uid });
-const assignedTo = userDoc?.managerId || '';
     const {
       tripId,       // rfq._id
       rfqId,        // short display id (optional)
       tripName,
       requestedBy,  // dummy: 'user'
+      assignedTo: bodyAssignedTo, // manager's uid from body
       budget,       // rfq.budget
       grandTotal,   // plan ka calculated total
       planItems,    // pura plan array
@@ -24,7 +24,10 @@ const assignedTo = userDoc?.managerId || '';
       numberOfAdults,
       numberOfChildren,
       numberOfInfants,
+      userNote,
     } = req.body;
+
+    const assignedTo = bodyAssignedTo || userDoc?.managerId || '';
 
     if (!tripId) {
       return res.status(400).json({ success: false, message: 'tripId required' });
@@ -41,6 +44,8 @@ const assignedTo = userDoc?.managerId || '';
       if (rfqId != null && rfqId !== '') existing.rfqId = String(rfqId);
       existing.status       = 'pending';
       existing.sentAt       = new Date();
+      existing.userNote     = userNote || '';
+      existing.assignedTo   = assignedTo || existing.assignedTo;
       existing.approvedBudget  = null;
       existing.managerComment  = '';
       await existing.save();
@@ -60,6 +65,7 @@ const assignedTo = userDoc?.managerId || '';
       numberOfAdults:   numberOfAdults   || 1,
       numberOfChildren: numberOfChildren || 0,
       numberOfInfants:  numberOfInfants  || 0,
+      userNote:         userNote         || '',
       status: 'pending',
       sentAt: new Date(),
     });

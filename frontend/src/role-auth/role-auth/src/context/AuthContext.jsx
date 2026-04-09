@@ -9,19 +9,21 @@ import axios from 'axios'
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]   = useState(null);
-  const [error, setError] = useState('');
+  const [user, setUser]           = useState(null);
+  const [error, setError]         = useState('');
+  const [authLoading, setAuthLoading] = useState(true); // ← YEH ADD KARO
 
   const login = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password)
       const token = await result.user.getIdToken()
-      // ✅ FIX: name variable ab actually use ho raha hai
       const name = result.user.displayName || result.user.email.split('@')[0]
       const res = await axios.post('/api/users/sync', { name }, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setUser({ ...result.user, role: res.data.data.role })
+      const userWithRole = result.user;
+      userWithRole.role = res.data.data.role;
+      setUser(userWithRole)
     } catch (err) {
       setError(err.message)
     }
@@ -35,33 +37,46 @@ export function AuthProvider({ children }) {
       const res = await axios.post('/api/users/sync', { name }, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setUser({ ...result.user, role: res.data.data.role })
+      const userWithRole = result.user;
+      userWithRole.role = res.data.data.role;
+      setUser(userWithRole)
     } catch (err) {
       setError(err.message)
     }
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const token = await firebaseUser.getIdToken()
-        // ✅ FIX: yahan bhi same fallback
-        const name = firebaseUser.displayName || firebaseUser.email.split('@')[0]
-        const res = await axios.post('/api/users/sync', { name }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        setUser({ ...firebaseUser, role: res.data.data.role })
-      } else {
-        setUser(null)
-      }
-    })
+   const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+  try {
+    if (firebaseUser) {
+      const token = await firebaseUser.getIdToken(true)
+      const name = firebaseUser.displayName || firebaseUser.email.split('@')[0]
+      const res = await axios.post('/api/users/sync', { name }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      firebaseUser.role = res.data.data.role;
+      setUser(firebaseUser)
+    } else {
+      setUser(null)
+    }
+  } catch (err) {
+    console.error('Auth sync failed:', err.message)
+    setUser(null)
+  } finally {
+    setAuthLoading(false) // ← finally mein daalo — guaranteed chalega
+  }
+})
     return () => unsubscribe()
   }, [])
 
-  const logout = () => signOut(auth)
+  const logout = () => {
+    localStorage.clear(); // Clear all data including tp_profile
+    return signOut(auth);
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, error, setError }}>
+    // ↓ authLoading ADD KARO value mein
+    <AuthContext.Provider value={{ user, login, register, logout, error, setError, authLoading }}>
       {children}
     </AuthContext.Provider>
   );

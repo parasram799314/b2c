@@ -35,12 +35,20 @@ export async function verifyToken(req, res, next) {
 // Role check middleware factory
 export function requireRole(...roles) {
   return async (req, res, next) => {
-    const user = await User.findOne({ uid: req.uid });
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (!roles.includes(user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+    try {
+      const user = await User.findOne({ uid: req.uid });
+      if (!user) {
+        console.log(`[Auth] User ${req.uid} not found in MongoDB`);
+        return res.status(404).json({ success: false, message: `User record not found in database for UID: ${req.uid.slice(-6)}. Please logout and login again.` });
+      }
+      if (!roles.includes(user.role)) {
+        console.log(`[Auth] Access denied for ${user.role}. Required: ${roles.join(',')}`);
+        return res.status(403).json({ success: false, message: `Access denied. Role '${user.role}' does not have permission.` });
+      }
+      req.user = user;
+      next();
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Internal server error during role check' });
     }
-    req.user = user;
-    next();
   };
 }
