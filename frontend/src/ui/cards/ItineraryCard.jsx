@@ -180,7 +180,7 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
     : rfq.reviewStatus === 'rejected'  ? 'rejected'
     : null;
 
-  const isBusiness = true;
+  const isPersonal = rfq.tripType === 'personal';
 
   return (
     <>
@@ -196,28 +196,26 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
   style={{ paddingTop: '5px' }}
   onClick={() => onOpen(rfq)}
 >
-        {/* ✅ BUSINESS TRAVEL TAG (External style) */}
-        {isBusiness && (
-          <span style={{ 
-            position: 'absolute', 
-            top: '-9px', 
-            left: '12px',
-            zIndex: 10, 
-            fontSize: '8px', 
-            fontWeight: 900, 
-            padding: '2px 10px', 
-            borderRadius: '4px', 
-            background: 'rgb(247,190,57)', 
-            color: '#1a1a1a', 
-            border: '1.5px solid #f59e0b', 
-            letterSpacing: '0.08em', 
-            textTransform: 'uppercase', 
-            boxShadow: '0 2px 6px rgba(247,190,57,0.45)', 
-            whiteSpace: 'nowrap' 
-          }}>
-            💼 Business Travel
-          </span>
-        )}
+        {/* ✅ TRIP TYPE TAG (Business vs Personal) */}
+        <span style={{ 
+          position: 'absolute', 
+          top: '-9px', 
+          left: '12px',
+          zIndex: 10, 
+          fontSize: '8px', 
+          fontWeight: 900, 
+          padding: '2px 10px', 
+          borderRadius: '4px', 
+          background: isPersonal ? '#dcfce7' : 'rgb(247,190,57)', 
+          color: isPersonal ? '#166534' : '#1a1a1a', 
+          border: `1.5px solid ${isPersonal ? '#86efac' : '#f59e0b'}`, 
+          letterSpacing: '0.08em', 
+          textTransform: 'uppercase', 
+          boxShadow: `0 2px 6px ${isPersonal ? 'rgba(22,101,52,0.2)' : 'rgba(247,190,57,0.45)'}`, 
+          whiteSpace: 'nowrap' 
+        }}>
+          {isPersonal ? '🏝️ Personal Travel' : '💼 Business Travel'}
+        </span>
 
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
           {/* ── Image Section ── */}

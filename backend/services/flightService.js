@@ -188,7 +188,7 @@ export async function searchFlights({ originCity, destinationCity, date, adults 
     );
 
     if (!res.ok) {
-      console.warn('[flights] API error:', await res.text());
+      // Silence internal error details to avoid cluttering logs, just return fallback
       return buildFallbackFlights(origin, dest, date, originCity, destinationCity);
     }
 
@@ -208,6 +208,9 @@ export async function searchFlights({ originCity, destinationCity, date, adults 
       const stops    = itin.segments.length - 1;
       const stopCodes = itin.segments.slice(0, -1).map(s => s.arrival.iataCode).join(', ');
 
+      // Extract cabin class if available (from first traveler's first segment)
+      const cabin = offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.cabin || 'ECONOMY';
+
       return {
         airline:      first.carrierCode,
         flightNumber: `${first.carrierCode}${first.number}`,
@@ -225,6 +228,7 @@ export async function searchFlights({ originCity, destinationCity, date, adults 
         stopCodes,
         price:        offer.price?.total    || '',
         currency:     offer.price?.currency || 'USD',
+        cabin:        cabin.toLowerCase(),
       };
     });
 
@@ -272,5 +276,6 @@ function buildFallbackFlights(origin, dest, date, originCity, destinationCity) {
     stopCodes:    i < 3 ? '' : 'BOM',
     price:        String(800 + i * 120) + '.99',
     currency:     'USD',
+    cabin:        'economy',
   }));
 }

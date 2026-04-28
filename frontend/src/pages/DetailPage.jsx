@@ -14,7 +14,7 @@ import TripDetailsModal from '../components/detail/headings/TripDetailsModal';
 import { Icons } from '../ui/icons';
 import PlanPanel, { BookView } from '../components/detail/PlanPanel';
 import PermissionAvatars from '../components/detail/headings/PermissionAvatars';
-import axios from 'axios'; // ✅ Ye line add karo
+import axios from '../utils/axiosConfig'; // ✅ Ye line add karo
 import TripVoucherModal from '../components/detail/headings/TripVoucherModal';
 import PlanCard, {
   ShieldEmpty,
@@ -443,8 +443,12 @@ function DestinationTimeline({
   onUpdateItem,  
   onMoveToTrip,
   currentTripId,
-  onShowVoucher
- 
+  onShowVoucher,
+  isPersonal = false,
+  approvalStatus = null,
+  approvalLoading = false,
+  setShowBudgetModal,
+  onPay
 }) {
   const [collapsedDays, setCollapsedDays] = useState({});
 
@@ -885,7 +889,16 @@ if (rawDate !== 'No Date' && tripBaseline) {
           {/* 1. Book Button — LEFT */}
           <button
             type="button"
-            onClick={() => !readOnlyPlan && setShowBookView(true)}
+            onClick={() => {
+              if (isPersonal) {
+                if (window.confirm("Do you want to book this personal trip? All items will be marked as paid.")) {
+                  onPay?.(planItems.map(p => p.id));
+                  window.alert("Trip booked successfully!");
+                }
+              } else {
+                !readOnlyPlan && setShowBookView(true);
+              }
+            }}
             disabled={readOnlyPlan}
             style={{
               padding: '10px 28px',
@@ -927,35 +940,36 @@ if (rawDate !== 'No Date' && tripBaseline) {
 >
   🎫 Voucher
 </button>
-          <button
-            type="button"
-
-            onClick={onSendTripReview}
-            disabled={!canSendTripReview || reviewSendLoading || readOnlyPlan}
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              background: readOnlyPlan ? '#dcfce7' : canSendTripReview ? '#fff' : '#f3f4f6',
-              border: `1px solid ${readOnlyPlan ? '#86efac' : '#e5e7eb'}`,
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: readOnlyPlan ? '#166534' : '#6b7280',
-              cursor: !canSendTripReview || reviewSendLoading || readOnlyPlan ? 'not-allowed' : 'pointer',
-              whiteSpace: 'nowrap',
-              textAlign: 'center',
-            }}
-          >
-            {reviewSendLoading
-              ? '⏳ Sending…'
-              : readOnlyPlan
-                ? '✅ Trip review approved (locked)'
-                : tripReviewStatus === 'sent'
-                  ? '⏳ Manager reviewing trip…'
-                  : tripReviewStatus === 'rejected'
-                    ? '↩️ Re-send trip review'
-                    : '📤 Send trip to manager review'}
-          </button>
+          {!isPersonal && (
+            <button
+              type="button"
+              onClick={onSendTripReview}
+              disabled={!canSendTripReview || reviewSendLoading || readOnlyPlan}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                background: readOnlyPlan ? '#dcfce7' : canSendTripReview ? '#fff' : '#f3f4f6',
+                border: `1px solid ${readOnlyPlan ? '#86efac' : '#e5e7eb'}`,
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: readOnlyPlan ? '#166534' : '#6b7280',
+                cursor: !canSendTripReview || reviewSendLoading || readOnlyPlan ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+              }}
+            >
+              {reviewSendLoading
+                ? '⏳ Sending…'
+                : readOnlyPlan
+                  ? '✅ Trip review approved (locked)'
+                  : tripReviewStatus === 'sent'
+                    ? '⏳ Manager reviewing trip…'
+                    : tripReviewStatus === 'rejected'
+                      ? '↩️ Re-send trip review'
+                      : '📤 Send trip to manager review'}
+            </button>
+          )}
           {/* 3. Estimated Total — RIGHT */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
             <span style={{ fontSize: '9px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1653,18 +1667,19 @@ const reorderPlan = (fromIdx, toIdx) => {
 const otherTotal     = planItems.filter(p => p.type === 'other'     && p.status !== 'cancelled').reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
 const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
 
-  const activeBudget = rfq.budget || rfq.tripBudget || profile.budget || 0;
-
-  /** User-facing trip ref (form pe jo ID dikhti hai); API/localStorage ke liye _id same rehta hai */
   const displayTripId =
     (rfq?.rfqId && String(rfq.rfqId).trim()) ||
     (rfq?._id && String(rfq._id).replace(/: /g, '').trim()) ||
     '';
+
+  const isPersonal = rfq?.tripType === 'personal';
+  const activeBudget = isPersonal ? Infinity : (approvalStatus?.approvedBudget || profile?.budget || 0);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
 
       {/* Budget Exceeded Toast */}
-      {showBudgetToast && (
+      {showBudgetToast && !isPersonal && grandTotal > activeBudget && (
         <BudgetToast
           grandTotal={grandTotal}
           budget={activeBudget}
@@ -1829,49 +1844,55 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
   </button>
 
   {/* Separator */}
-  <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
+  {!isPersonal && <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />}
 
   {/* Shield + View Policy */}
-  <div style={{ display:'flex', alignItems:'center', gap:'5px', cursor:'pointer' }}>
-    <ShieldEmpty size={18} />
-    <span style={{ fontSize:'12px', color:'#1e40af', textDecoration:'underline', fontWeight:700 }}>View policy</span>
-  </div>
+  {!isPersonal && (
+    <div style={{ display:'flex', alignItems:'center', gap:'5px', cursor:'pointer' }}>
+      <ShieldEmpty size={18} />
+      <span style={{ fontSize:'12px', color:'#1e40af', textDecoration:'underline', fontWeight:700 }}>View policy</span>
+    </div>
+  )}
 
   {/* Separator */}
-  <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
+  {!isPersonal && <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />}
 
   {/* Budget status pills */}
-  {approvalStatus?.status === 'approved' && (
+  {!isPersonal && (
     <>
-      <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#dcfce7', border:'1px solid #86efac', fontSize:'11px', fontWeight:700, color:'#166534', whiteSpace:'nowrap' }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-        ₹{Number(approvalStatus.approvedBudget).toLocaleString('en-IN')} approved
-      </div>
-      <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#f0fdfa', border:'1px solid #99f6e4', fontSize:'11px', fontWeight:700, color:'#0f766e', whiteSpace:'nowrap' }}>
-        ₹{Math.max(0, Number(approvalStatus.approvedBudget) - grandTotal).toLocaleString('en-IN')} left
-      </div>
+      {approvalStatus?.status === 'approved' && (
+        <>
+          <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#dcfce7', border:'1px solid #86efac', fontSize:'11px', fontWeight:700, color:'#166534', whiteSpace:'nowrap' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ₹{Number(approvalStatus.approvedBudget).toLocaleString('en-IN')} approved
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:'4px', padding:'4px 10px', borderRadius:'8px', background:'#f0fdfa', border:'1px solid #99f6e4', fontSize:'11px', fontWeight:700, color:'#0f766e', whiteSpace:'nowrap' }}>
+            ₹{Math.max(0, Number(approvalStatus.approvedBudget) - grandTotal).toLocaleString('en-IN')} left
+          </div>
+        </>
+      )}
+      {approvalStatus?.status === 'rejected' && (
+        <div style={{ fontSize:'10px', fontWeight:700, color:'#991b1b', background:'#fee2e2', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fecaca', whiteSpace:'nowrap' }}>
+          ❌ Rejected{approvalStatus.managerComment ? ` · ${approvalStatus.managerComment}` : ''}
+        </div>
+      )}
+      {approvalStatus?.status === 'pending' && (
+        <div style={{ fontSize:'10px', fontWeight:700, color:'#92400e', background:'#fef3c7', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fde68a', whiteSpace:'nowrap' }}>
+          ⏳ Approval pending
+        </div>
+      )}
+      {!approvalStatus?.status && (
+        <button
+          type="button"
+          disabled={planFrozen || approvalLoading}
+          onClick={() => setShowBudgetModal(true)}
+          style={{ display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'8px', background: planFrozen ? '#f3f4f6' : '#fff', border:'1px solid rgb(247,190,57)', cursor: planFrozen || approvalLoading ? 'not-allowed' : 'pointer', fontSize:'11px', fontWeight:700, color: planFrozen ? '#9ca3af' : 'rgb(180,130,0)', whiteSpace:'nowrap', opacity: planFrozen ? 0.7 : 1 }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 21v-8m4 8v-5M8 21v-3"/></svg>
+          Set Budget
+        </button>
+      )}
     </>
-  )}
-  {approvalStatus?.status === 'rejected' && (
-    <div style={{ fontSize:'10px', fontWeight:700, color:'#991b1b', background:'#fee2e2', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fecaca', whiteSpace:'nowrap' }}>
-      ❌ Rejected{approvalStatus.managerComment ? ` · ${approvalStatus.managerComment}` : ''}
-    </div>
-  )}
-  {approvalStatus?.status === 'pending' && (
-    <div style={{ fontSize:'10px', fontWeight:700, color:'#92400e', background:'#fef3c7', padding:'4px 8px', borderRadius:'6px', border:'1px solid #fde68a', whiteSpace:'nowrap' }}>
-      ⏳ Approval pending
-    </div>
-  )}
-  {!approvalStatus?.status && (
-    <button
-      type="button"
-      disabled={planFrozen || approvalLoading}
-      onClick={() => setShowBudgetModal(true)}
-      style={{ display:'flex', alignItems:'center', gap:'5px', padding:'5px 10px', borderRadius:'8px', background: planFrozen ? '#f3f4f6' : '#fff', border:'1px solid rgb(247,190,57)', cursor: planFrozen || approvalLoading ? 'not-allowed' : 'pointer', fontSize:'11px', fontWeight:700, color: planFrozen ? '#9ca3af' : 'rgb(180,130,0)', whiteSpace:'nowrap', opacity: planFrozen ? 0.7 : 1 }}
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 21v-8m4 8v-5M8 21v-3"/></svg>
-      Set Budget
-    </button>
   )}
 
   {/* Separator */}
@@ -1976,6 +1997,17 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                     rfq={rfq}
                     onRfqUpdate={handleRfqUpdate}
                     onTabSwitch={tab => setActiveFilter(tab)}
+                    onResults={({ planItem }) => {
+                      if (planItem) {
+                        const itemData = planItem.data || planItem;
+                        const item = { 
+                          ...itemData, 
+                          type: planItem.type, 
+                          id: `${planItem.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` 
+                        };
+                        addToPlan(item);
+                      }
+                    }}
                     onClose={() => setChatOpen(false)}
                   />
                 </div>
@@ -2015,10 +2047,14 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                   onViewAttachments={() => setShowAttachments(true)}
                   onUpdateItem={updatePlanItem}
                   onMoveToTrip={handleMoveToTrip}
-                   currentTripId={rfq._id}  
-                   onShowVoucher={() => setShowVoucher(true)} 
-                />
-              )}
+                  currentTripId={rfq._id}  
+                  onShowVoucher={() => setShowVoucher(true)} 
+                  isPersonal={isPersonal}
+                  approvalStatus={approvalStatus}
+                  approvalLoading={approvalLoading}
+                  setShowBudgetModal={setShowBudgetModal}
+                  onPay={handlePay}
+                  />              )}
             </div>
 
             <ResizerHandle visible={true} onMouseDown={(e) => startResizing('right', e)} />
@@ -2092,6 +2128,11 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
                      onViewAttachments={() => setShowAttachments(true)}  // ✅ ADD (agar nahi hai)
   onUpdateItem={updatePlanItem}      
   onMoveToTrip={handleMoveToTrip}
+  isPersonal={isPersonal}
+  approvalStatus={approvalStatus}
+  approvalLoading={approvalLoading}
+  setShowBudgetModal={setShowBudgetModal}
+  onPay={handlePay}
                   />
                 )}
               </div>

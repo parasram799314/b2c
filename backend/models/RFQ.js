@@ -186,6 +186,7 @@ budget:   { type: Number, default: 0  },
     reviewApprovedAt: { type: String, default: '' },
     reviewPayload: { type: mongoose.Schema.Types.Mixed, default: null },
     planItems:     { type: [mongoose.Schema.Types.Mixed], default: [] },
+    tripType:      { type: String, enum: ['business', 'personal'], default: 'business' },
     
     createdBy:  { type: String, default: '' }, // Firebase UID
 assignedTo: { type: String, default: '' }, // Manager ka Firebase UID

@@ -83,7 +83,6 @@ const getLogoUrl = (name = '') => {
 const fmt = (n) => `${Number(n).toLocaleString('en-IN')}`;
 const fmtCurrency = (price, currency = 'USD') => {
   const num = Number(price);
-  // Always show in INR (convert from USD if needed)
   const inrAmount = currency === 'USD' ? Math.round(num * 83) : Math.round(num);
   return `₹${inrAmount.toLocaleString('en-IN')}`;
 };
@@ -105,26 +104,24 @@ function FlightCard({ flight, inPlan, onAdd }) {
 
   return (
     <>
-      <div 
-       draggable="true"
-  // FlightCard component mein onDragStart fix:
-onDragStart={(e) => {
-  const rawPrice = Number(flight.price);
-  const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
-  
-  const dragData = {
-    ...flight,
-    type: 'flight',
-    id: 'flight_' + (flight.id || flight.flightNumber || Date.now()),
-    price: inrPrice,  // ✅ INR price
-    depTime: flight.departureTime ?? flight.depTime,
-    arrTime: flight.arrivalTime ?? flight.arrTime,
-    depDate: flight.depDate || '',
-  };
-  e.dataTransfer.setData("itemData", JSON.stringify(dragData));
-  e.dataTransfer.effectAllowed = "copy";
-}}
-      style={{ background:'#fff', border:`1px solid ${inPlan?'#F7BE39':'#e5e7eb'}`, borderRadius:'12px', overflow:'hidden', marginBottom:'10px', boxShadow: inPlan?'0 0 0 2px rgba(247,190,57,0.2)':'0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div
+        draggable="true"
+        onDragStart={(e) => {
+          const rawPrice = Number(flight.price);
+          const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
+          const dragData = {
+            ...flight,
+            type: 'flight',
+            id: 'flight_' + (flight.id || flight.flightNumber || Date.now()),
+            price: inrPrice,
+            depTime: flight.departureTime ?? flight.depTime,
+            arrTime: flight.arrivalTime ?? flight.arrTime,
+            depDate: flight.depDate || '',
+          };
+          e.dataTransfer.setData("itemData", JSON.stringify(dragData));
+          e.dataTransfer.effectAllowed = "copy";
+        }}
+        style={{ background:'#fff', border:`1px solid ${inPlan?'#F7BE39':'#e5e7eb'}`, borderRadius:'12px', overflow:'hidden', marginBottom:'10px', boxShadow: inPlan?'0 0 0 2px rgba(247,190,57,0.2)':'0 1px 3px rgba(0,0,0,0.06)' }}>
 
         {/* Logo + route */}
         <div style={{ padding:'12px 14px 6px', display:'flex', alignItems:'center', gap:'10px' }}>
@@ -246,7 +243,6 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
   const [maxPriceLimit, setMaxPriceLimit] = useState(300000);
   const [visibleCount,  setVisibleCount]  = useState(15);
   const [dates,         setDates]         = useState([]);
-  const [selectedDate,  setSelectedDate]  = useState('');
   const [dateOffset,    setDateOffset]    = useState(0);
   const [showFilters,   setShowFilters]   = useState(false);
   const observerRef = useRef(null);
@@ -257,12 +253,18 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
   const adults = rfq?.numberOfPax || 1;
 
   // Find the selected destination from rfq.destinations
-  const selectedDestData = selectedDest 
-    ? rfq?.destinations?.find(d => d.destination === selectedDest) 
+  const selectedDestData = selectedDest
+    ? rfq?.destinations?.find(d => d.destination === selectedDest)
     : firstDest;
 
-  const [toCity, setToCity] = useState(selectedDestData?.destination || '');
-  
+  // ✅ FIX 1: Initial value directly from selectedDestData — no override useEffect needed
+  const [toCity, setToCity] = useState(() => selectedDestData?.destination || '');
+  const [selectedDate, setSelectedDate] = useState(() =>
+    selectedDestData?.dateOfArrival
+      ? new Date(selectedDestData.dateOfArrival).toISOString().slice(0, 10)
+      : ''
+  );
+
   const handleSwap = (e) => {
     e.stopPropagation();
     const temp = fromCity;
@@ -270,16 +272,26 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
     setToCity(temp);
   };
 
-  // Update toCity when selectedDest changes
+  const lastSelectedDestRef = useRef(selectedDest);
+
+  // ✅ FIX 2: Only update toCity/selectedDate when selectedDest TAB changes — not on every render
   useEffect(() => {
-    if (selectedDestData?.destination) {
-      setToCity(selectedDestData.destination);
+    if (selectedDest !== lastSelectedDestRef.current) {
+      if (selectedDestData?.destination) {
+        setToCity(selectedDestData.destination);
+      }
+      if (selectedDestData?.dateOfArrival) {
+        setSelectedDate(new Date(selectedDestData.dateOfArrival).toISOString().slice(0, 10));
+      }
+      lastSelectedDestRef.current = selectedDest;
     }
-  }, [selectedDestData]);
+  }, [selectedDest, selectedDestData]);
 
   const baseDate = selectedDestData?.dateOfArrival
     ? new Date(selectedDestData.dateOfArrival).toISOString().slice(0,10)
     : new Date().toISOString().slice(0,10);
+
+  // ✅ FIX 3: Woh rogue useEffect DELETE kar diya jo bar bar toCity/selectedDate override karta tha
 
   // Date strip
   useEffect(()=>{
@@ -288,7 +300,11 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
     const strip = [];
     for(let i=-2+dateOffset;i<=2+dateOffset;i++){ const d=new Date(base); d.setDate(d.getDate()+i); if(d>=today)strip.push(d.toISOString().slice(0,10)); }
     setDates(strip);
-    if(!selectedDate||!strip.includes(selectedDate)) setSelectedDate(strip[Math.min(2,strip.length-1)]||'');
+
+    // Only set selectedDate if it's currently empty
+    if(!selectedDate && strip.length > 0) {
+      setSelectedDate(strip[Math.min(2,strip.length-1)]||'');
+    }
   },[baseDate,dateOffset]);
 
   // Fetch
@@ -300,9 +316,8 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
       const list = Array.isArray(res.data)?res.data:(res.data?.onward||[]);
       setRawFlights(list);
       if(list.length){ const prices=list.map(f=>Number(f.price)).filter(p=>p>0); if(prices.length){ const mn=Math.min(...prices),mx=Math.max(...prices); setMinPrice(mn); setMaxPriceLimit(mx); setFilters(p=>({...p,maxPrice:mx})); } }
-    }catch{ 
-      // Silently use empty array - backend fallback will provide data
-      setRawFlights([]); 
+    }catch{
+      setRawFlights([]);
     }
     setLoading(false);
   };
@@ -358,32 +373,27 @@ export default function FlightsTab({ rfq, planItems, onAddToPlan, selectedDest }
   },[rawFlights]);
 
   const planIds = planItems.map(p=>p.id);
-  // components/FlightsTab.jsx mein handleAdd function ko update karein
 
-const handleAdd = (flight) => {
-  const id = 'flight_' + (flight.id || flight.flightNumber || Date.now());
-  
-  // --- YE LOGIC ADD KAREIN: USD ko INR mein convert karke save karo ---
-  const rawPrice = Number(flight.price);
-  const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
+  const handleAdd = (flight) => {
+    const id = 'flight_' + (flight.id || flight.flightNumber || Date.now());
+    const rawPrice = Number(flight.price);
+    const inrPrice = flight.currency === 'USD' ? Math.round(rawPrice * 83) : rawPrice;
+    onAddToPlan({
+      ...flight,
+      type: 'flight',
+      id,
+      price: inrPrice,
+      depTime: flight.departureTime ?? flight.depTime,
+      arrTime: flight.arrivalTime ?? flight.arrTime,
+      depDate: selectedDate
+    });
+  };
 
-  onAddToPlan({
-    ...flight,
-    type: 'flight',
-    id,
-    price: inrPrice, // Ab yahan 19000+ wala number save hoga
-    depTime: flight.departureTime ?? flight.depTime,
-    arrTime: flight.arrivalTime ?? flight.arrTime,
-    depDate: selectedDate
-  });
-};
   const inputBox = { display:'flex',alignItems:'center',gap:'8px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'8px',padding:'8px 10px' };
   const lbl = { fontSize:'10px',fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'4px' };
 
   return (
-    <div
-    
-     style={{display:'flex',flexDirection:'column',height:'100%',overflowY:'auto',background:'#f3f4f6'}}>
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflowY:'auto',background:'#f3f4f6'}}>
 
       {/* Destination indicator */}
       {selectedDest && (
@@ -416,40 +426,40 @@ const handleAdd = (flight) => {
             </div>
 
             {/* SWAP BUTTON */}
-             <button 
-    onClick={handleSwap}
-    style={{
-      position:'absolute', 
-      right:'20px',           /* Right se thoda andar */
-      top:'54px',             /* From label + input height ke hisaab se manually set kiya */
-      zIndex:100, 
-      width:'28px', 
-      height:'28px', 
-      borderRadius:'50%', 
-      background:'#fff',
-      border:'1px solid #e5e7eb', 
-      color:'#F7BE39', 
-      cursor:'pointer',
-      display:'flex', 
-      alignItems:'center', 
-      justifyContent: 'center', 
-      fontSize:'16px', 
-      fontWeight:700,
-      boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
-      transition: 'all 0.2s'
-    }}
-    onMouseEnter={e => {
-      e.currentTarget.style.borderColor = '#F7BE39';
-      e.currentTarget.style.transform = 'scale(1.1)';
-    }}
-    onMouseLeave={e => {
-      e.currentTarget.style.borderColor = '#e5e7eb';
-      e.currentTarget.style.transform = 'scale(1)';
-    }}
-    title="Swap From/To"
-  >
-    ⇄
-  </button>
+            <button
+              onClick={handleSwap}
+              style={{
+                position:'absolute',
+                right:'20px',
+                top:'54px',
+                zIndex:100,
+                width:'28px',
+                height:'28px',
+                borderRadius:'50%',
+                background:'#fff',
+                border:'1px solid #e5e7eb',
+                color:'#F7BE39',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                justifyContent: 'center',
+                fontSize:'16px',
+                fontWeight:700,
+                boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#F7BE39';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="Swap From/To"
+            >
+              ⇄
+            </button>
 
             {/* TO */}
             <div style={{ marginBottom:'8px' }}>
@@ -476,19 +486,15 @@ const handleAdd = (flight) => {
       </div>
 
       {/* 2. FILTER TOGGLE */}
-     {/* 2. FILTER TOGGLE */}
       <div style={{flexShrink:0,background:'#fff',borderBottom:'1px solid #e5e7eb'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',cursor:'pointer'}} onClick={()=>setShowFilters(v=>!v)}>
-          
+
           {/* LEFT SIDE: Arrow Icon + Heading + Reset Button */}
           <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-            {/* Arrow Icon yahan move kar diya */}
             <span style={{fontSize:'11px',color:'#9ca3af'}}>{showFilters?'▲':'▼'}</span>
-            
             <span style={{fontSize:'13px',fontWeight:700,color:'#111827'}}>Sort &amp; Filter</span>
-            
-            <button 
-              onClick={e=>{e.stopPropagation();setFilters(mkDefaults(maxPriceLimit));}} 
+            <button
+              onClick={e=>{e.stopPropagation();setFilters(mkDefaults(maxPriceLimit));}}
               style={{fontSize:'11px',color:'#F7BE39',background:'none',border:'none',cursor:'pointer',fontWeight:700}}
             >
               Reset All

@@ -366,7 +366,7 @@ function TravelersBar({ travelers, setTravelers, budget, setBudget, tripReviewer
 // ─────────────────────────────────────────────────────────────
 // ── MAIN TRIP PLANNER TAB COMPONENT ──────────────────────────
 // ─────────────────────────────────────────────────────────────
-export default function TripPlannerTab({ rfqId, onSubmit, loading }) {
+export default function TripPlannerTab({ rfqId, onSubmit, loading, travelType = 'business' }) {
   // ── MODE: 'manual' | 'ai' ───────────────────────────────────
   const [mode, setMode] = useState('manual');
 
@@ -505,6 +505,8 @@ Use sensible defaults if data is missing (adults: 1, children: 0, infants: 0, tr
       numberOfAdults: adults, numberOfChildren: children, numberOfInfants: infants,
       travelClass: tClass, budget, reviewer: tripReviewer, note,
       returnToBase,
+      travelType,   // business | personal
+      tripType: travelType, // business | personal
       createdAt: new Date().toISOString(), status:'draft',
     };
     onSubmit?.(rfq);

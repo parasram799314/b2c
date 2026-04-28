@@ -503,7 +503,8 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
       numberOfChildren: children,
       numberOfInfants:  infants,
       travelClass:      tClass,
-      travelType,
+      travelType,               // business | personal
+      tripType:         travelType, // mapped for consistency with backend field name
       budget,
       reviewer:         tripReviewer,
       note,
@@ -743,6 +744,7 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
                   rfqId={rfqId}
                   onSubmit={onSubmit}
                   loading={loading}
+                  travelType={travelType}
                 />
               )}
 
