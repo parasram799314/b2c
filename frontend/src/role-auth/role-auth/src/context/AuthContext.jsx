@@ -44,6 +44,7 @@ export function AuthProvider({ children }) {
                 headers: { Authorization: `Bearer ${storedToken}` }
               });
               if (res.data?.success) {
+                console.log('[Auth] Profile synced successfully from stored token');
                 // Mock user object for the app
                 const mockUser = {
                   ...res.data.data,
@@ -54,11 +55,12 @@ export function AuthProvider({ children }) {
                 };
                 setUser(mockUser);
               } else {
+                console.warn('[Auth] Profile sync returned success:false');
                 setUser(null);
                 localStorage.removeItem('fb_token');
               }
             } catch (err) {
-              console.error('Manual token sync failed:', err.message);
+              console.error('[Auth] Manual token sync failed (likely backend unreachable):', err.message);
               setUser(null);
               localStorage.removeItem('fb_token');
             }

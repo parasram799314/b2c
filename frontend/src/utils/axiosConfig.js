@@ -1,11 +1,15 @@
 import axios from 'axios'
 import { auth } from '../firebase/config'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Use environment variable if set, otherwise default to empty string for relative paths in production
+// On local dev, setupProxy.js will handle /api calls.
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 const axiosInstance = axios.create({
   baseURL: API_URL
 });
+
+console.log('[Axios] Base URL set to:', API_URL || '(relative)');
 
 axiosInstance.interceptors.request.use(async (config) => {
   let token = null;
@@ -15,7 +19,7 @@ axiosInstance.interceptors.request.use(async (config) => {
     try {
       token = await user.getIdToken(true);
     } catch (e) {
-      console.error('Token fetch failed', e);
+      console.error('[Axios] Token fetch failed', e);
     }
   } else {
     // Fallback to localStorage token if Firebase user is not loaded yet
@@ -28,5 +32,13 @@ axiosInstance.interceptors.request.use(async (config) => {
   
   return config;
 })
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('[Axios] API Error:', error.response?.status, error.message);
+    return Promise.reject(error);
+  }
+);
 
 export default axiosInstance
