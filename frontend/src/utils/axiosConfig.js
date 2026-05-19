@@ -8,16 +8,25 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use(async (config) => {
-  const user = auth.currentUser
+  let token = null;
+  const user = auth.currentUser;
+  
   if (user) {
     try {
-      const token = await user.getIdToken(true) // force refresh
-      config.headers.Authorization = `Bearer ${token}`
+      token = await user.getIdToken(true);
     } catch (e) {
-      console.error('Token fetch failed', e)
+      console.error('Token fetch failed', e);
     }
+  } else {
+    // Fallback to localStorage token if Firebase user is not loaded yet
+    token = localStorage.getItem('fb_token');
   }
-  return config
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
 })
 
 export default axiosInstance
