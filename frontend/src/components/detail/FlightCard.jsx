@@ -1,10 +1,11 @@
 // components/detail/FlightCard.jsx
 // Standalone version — can be used independently outside DetailPage
+import { Icons } from '../../ui/icons';
 
 export default function FlightCard({ flight, recommended = false, inPlan = false, onAdd }) {
   return (
     <div className={`bg-white border rounded-2xl p-4 flex items-center gap-4 transition-all ${
-      recommended ? 'border-gold-300' : 'border-gray-200'
+      recommended ? 'border-gold-300 shadow-sm' : 'border-gray-200'
     } ${inPlan ? 'bg-gold-50 border-gold-200' : ''}`}>
 
       {/* Left — times + route */}
@@ -13,9 +14,11 @@ export default function FlightCard({ flight, recommended = false, inPlan = false
           <span className="text-xl font-black text-gray-900">{flight.depTime}</span>
           <div className="flex-1 flex items-center gap-1 min-w-0">
             <div className="h-px bg-gray-200 flex-1" />
-            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">{flight.duration}</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 flex items-center gap-1">
+              <Icons.Clock className="w-3 h-3" /> {flight.duration}
+            </span>
             <div className="h-px bg-gray-200 flex-1" />
-            <span className="text-gray-300 text-xs">▶</span>
+            <Icons.ChevronRight className="text-gray-300 w-3 h-3 flex-shrink-0" />
           </div>
           <span className="text-xl font-black text-gray-900">
             {flight.arrTime}
@@ -24,14 +27,17 @@ export default function FlightCard({ flight, recommended = false, inPlan = false
         </div>
 
         {/* From label */}
-        <div className="text-xs text-gold-600 font-semibold truncate">{flight.fromAirport}</div>
+        <div className="text-xs text-gold-600 font-semibold truncate flex items-center gap-1">
+           <Icons.Plane className="w-3 h-3 text-amber-500" /> {flight.fromAirport}
+        </div>
 
         {/* Tags row */}
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 flex items-center gap-1">
+            <Icons.Plane className="w-3 h-3" />
             {flight.stops === 0
-              ? '✈ Direct'
-              : `✈ ${flight.stops} stop${flight.stops > 1 ? 's' : ''}${flight.stopCodes ? ` · ${flight.stopCodes}` : ''}`}
+              ? 'Direct'
+              : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}${flight.stopCodes ? ` · ${flight.stopCodes}` : ''}`}
           </span>
           {flight.airline && (
             <span className="text-xs text-gray-400">· {flight.airline}</span>

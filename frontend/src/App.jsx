@@ -10,7 +10,6 @@ import AdminDashboard from './pages/AdminDashboard';
 // ── Role Auth Imports ─────────────────────────────────────────
 import { AuthProvider, useAuth }   from './role-auth/role-auth/src/context/AuthContext';
 import { TripReviewProvider }      from './role-auth/role-auth/src/context/TripReviewContext';
-import LoginPage                   from './role-auth/role-auth/src/pages/LoginPage';
 import ManagerPage                 from './role-auth/role-auth/src/pages/ManagerPage';
 
 // ─────────────────────────────────────────────────────────────
@@ -182,12 +181,25 @@ function AppInner() {
           animation: 'spin 0.8s linear infinite'
         }}/>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>Loading...</p>
+        <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>Syncing with Dashboard...</p>
       </div>
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: '#f9fafb', flexDirection: 'column', textAlign: 'center', padding: '20px'
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ margin: '0 0 8px', color: '#111827' }}>Access Denied</h2>
+        <p style={{ margin: 0, color: '#6b7280', maxWidth: '300px', lineHeight: '1.5' }}>
+          Please log in through the main Dashboard to access the Trip Planner.
+        </p>
+      </div>
+    );
+  }
 
   // Admin role: only dashboard, no back button functionality
   if (user.role === 'admin') {

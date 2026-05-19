@@ -212,9 +212,12 @@ export default function ItineraryCard({ rfq, onOpen, onDelete }) {
           letterSpacing: '0.08em', 
           textTransform: 'uppercase', 
           boxShadow: `0 2px 6px ${isPersonal ? 'rgba(22,101,52,0.2)' : 'rgba(247,190,57,0.45)'}`, 
-          whiteSpace: 'nowrap' 
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          items: 'center',
+          gap: '4px'
         }}>
-          {isPersonal ? '🏝️ Personal Travel' : '💼 Business Travel'}
+          {isPersonal ? <><Icons.PalmTree className="w-2.5 h-2.5"/> Personal Travel</> : <><Icons.ShieldCheck className="w-2.5 h-2.5"/> Business Travel</>}
         </span>
 
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">

@@ -1,5 +1,6 @@
 // src/components/shared/PlanCard.jsx
 import { useState ,useEffect, useRef  } from 'react';
+import { Icons } from '../../ui/icons';
 
 // ─── Policy Shield Icons ───────────────────────────────────────────────────────
 const ShieldCheck = ({ size = 18 }) => (
@@ -531,10 +532,10 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
   const renderFlightContent = () => (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <div style={{ width: '48px', height: '48px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '1px solid #f1f5f9', background: '#fff' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '1px solid #f1f5f9', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {logoSrc && !imgErr
             ? <img src={logoSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImgErr(true)} />
-            : <span style={{ fontSize: '24px' }}>✈️</span>}
+            : <Icons.Plane className="w-6 h-6 text-blue-500" />}
         </div>
         <div style={{ minWidth: '80px' }}>
           <div style={{ fontSize: '15px', color: '#1a1a1a', fontWeight: 800 }}>{item.airline || 'AI'}</div>
@@ -546,9 +547,13 @@ export default function PlanCard({ item, onRemove, itemIndex, onReorder, readOnl
             <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{item.from || 'IDR'}</div>
           </div>
           <div style={{ flex: 1, textAlign: 'center', minWidth: '80px', position: 'relative' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{item.duration || '10h 10m'}</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+               <Icons.Clock className="w-2.5 h-2.5" /> {item.duration || '10h 10m'}
+            </div>
             <div style={{ height: '1.5px', background: '#e2e8f0', width: '100%' }} />
-            <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800 }}>{item.stops === 0 ? 'Non-stop' : `${item.stops || 2} Stops`}</div>
+            <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+               <Icons.Plane className="w-2.5 h-2.5 text-amber-500" /> {item.stops === 0 ? 'Non-stop' : `${item.stops || 2} Stops`}
+            </div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 900 }}>{item.arrTime || '01:20'}</div>

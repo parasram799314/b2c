@@ -3,7 +3,7 @@ import RFQForm from '../components/RFQForm';
 import { ItineraryCard } from '../ui';
 import { Icons } from '../ui/icons';
 import heroBg from '../assets/hero-bg.png';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { useAuth } from '../role-auth/role-auth/src/context/AuthContext';
 import ManagerApprovalsSection from '../components/ManagerPanel';
 import HeaderProfileMenu from '../components/detail/headings/HeaderProfileMenu';

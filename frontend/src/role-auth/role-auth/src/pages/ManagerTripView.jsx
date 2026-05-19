@@ -6,7 +6,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import GroupChatBox from '../../../../components/detail/headings/GroupChatBox';
-import axios from 'axios';
+import axios from '../../../../utils/axiosConfig';
 
 // ─── Helpers ─────────────────────────────────────────────────
 const WEGO = 'https://assets.wego.com/image/upload/h_240,c_fill,f_auto,fl_lossy,q_auto:best,g_auto/v20260217/flights/airlines_square/';

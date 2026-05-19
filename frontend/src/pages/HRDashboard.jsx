@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { useAuth } from '../role-auth/role-auth/src/context/AuthContext';
 
 const Y = 'rgb(247,190,57)';

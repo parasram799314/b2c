@@ -1,11 +1,25 @@
 // components/detail/PlanPanel.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { fmt, getResolvedDate, getLogoUrl } from '../shared/PlanCard';
+import { Icons } from '../../ui/icons';
 
 
-const TYPE_ICONS  = { flight:'✈️', hotel:'🏨', attraction:'🗺️', restaurant:'🍽️', transfer:'🚗' };
+const TYPE_ICONS  = { 
+  flight: <Icons.Plane className="w-4 h-4" />, 
+  hotel: <Icons.Hotel className="w-4 h-4" />, 
+  attraction: <Icons.MapPin className="w-4 h-4" />, 
+  restaurant: <Icons.Utensils className="w-4 h-4" />, 
+  transfer: <Icons.Car className="w-4 h-4" /> 
+};
 const TYPE_COLORS = { flight:'bg-blue-50 border-blue-100', hotel:'bg-amber-50 border-amber-100', attraction:'bg-green-50 border-green-100', restaurant:'bg-orange-50 border-orange-100', transfer:'bg-gray-50 border-gray-100' };
-const TRANSPORT_ICONS = { cab:'🚕', metro:'🚇', bus:'🚌', rental:'🚗', train:'🚆', ferry:'⛴️' };
+const TRANSPORT_ICONS = { 
+  cab: <Icons.Car className="w-3.5 h-3.5" />, 
+  metro: <Icons.Train className="w-3.5 h-3.5" />, 
+  bus: <Icons.Bus className="w-3.5 h-3.5" />, 
+  rental: <Icons.Car className="w-3.5 h-3.5" />, 
+  train: <Icons.Train className="w-3.5 h-3.5" />, 
+  ferry: <Icons.Ship className="w-3.5 h-3.5" /> 
+};
 
 
 function SectionDivider({ label }) {
@@ -36,7 +50,7 @@ function Tag({ color, children }) {
 }
 
 function PlanItem({ item, onRemove, status }) {
-  const icon  = TYPE_ICONS[item.type]  || '📌';
+  const icon  = TYPE_ICONS[item.type]  || <Icons.MapPin className="w-4 h-4" />;
   const color = TYPE_COLORS[item.type] || 'bg-gray-50 border-gray-100';
   const isPaid = status === 'paid';
   const isInvalid = status === 'invalid';
@@ -49,43 +63,43 @@ function PlanItem({ item, onRemove, status }) {
     secondary=[item.airline,item.flightNumber].filter(Boolean).join(' · ');
     let rawDate=item.depDate||item.date||'';
     if (!rawDate&&item.id) { const p=item.id.split('_'),l=p[p.length-1]; if(/^\d{4}-\d{2}-\d{2}$/.test(l)) rawDate=l; }
-    if (rawDate) tags.push({color:'amber',label:`📅 ${fmtDate(rawDate)||rawDate}`});
-    if (item.depTime||item.arrTime) tags.push({color:'blue',label:`🕐 ${item.depTime||'?'} → ${item.arrTime||'?'}${item.nextDay?' (+1)':''}`});
-    if (item.duration) tags.push({color:'gray',label:`⏱ ${item.duration}`});
-    if (item.stops===0) tags.push({color:'green',label:'✈ Direct'});
-    else if (item.stops!=null) tags.push({color:'gray',label:`✈ ${item.stops} stop${item.stops>1?'s':''}`});
-    if (item.price) tags.push({color:'gold',label:`${item.currency||''} ${parseFloat(item.price).toLocaleString()}`});
+    if (rawDate) tags.push({color:'amber', label: <span className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3"/> {fmtDate(rawDate)||rawDate}</span>});
+    if (item.depTime||item.arrTime) tags.push({color:'blue', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> {item.depTime||'?'} → {item.arrTime||'?'}{item.nextDay?' (+1)':''}</span>});
+    if (item.duration) tags.push({color:'gray', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> {item.duration}</span>});
+    if (item.stops===0) tags.push({color:'green', label: <span className="flex items-center gap-1"><Icons.Plane className="w-3 h-3"/> Direct</span>});
+    else if (item.stops!=null) tags.push({color:'gray', label: <span className="flex items-center gap-1"><Icons.Plane className="w-3 h-3"/> {item.stops} stop{item.stops>1?'s':''}</span>});
+    if (item.price) tags.push({color:'gold', label: `${item.currency||''} ${parseFloat(item.price).toLocaleString()}`});
   }
   else if (item.type==='hotel') {
     primary=item.name||'Hotel';
     secondary=item.address||item.cityName||'';
     if (item.stars) secondary=`${'⭐'.repeat(Math.min(Number(item.stars),5))} ${secondary}`.trim();
-    if (item.checkIn) tags.push({color:'amber',label:`📅 Check-in: ${fmtDate(item.checkIn)}`});
-    if (item.nights)  tags.push({color:'blue', label:`🌙 ${item.nights} night${Number(item.nights)>1?'s':''}`});
-    if (item.price)   tags.push({color:'gold', label:`${item.currency||''} ${parseFloat(item.price).toLocaleString()}/night`});
-    if (item.rating)  tags.push({color:'green',label:`⭐ ${item.rating}`});
+    if (item.checkIn) tags.push({color:'amber', label: <span className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3"/> Check-in: {fmtDate(item.checkIn)}</span>});
+    if (item.nights)  tags.push({color:'blue', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> {item.nights} night{Number(item.nights)>1?'s':''}</span>});
+    if (item.price)   tags.push({color:'gold', label: `${item.currency||''} ${parseFloat(item.price).toLocaleString()}/night`});
+    if (item.rating)  tags.push({color:'green', label: <span className="flex items-center gap-1"><Icons.Star className="w-3 h-3"/> {item.rating}</span>});
   }
   else if (item.type==='transfer') {
-    const tIcon=TRANSPORT_ICONS[item.id]||'🚗';
-    primary=`${tIcon} ${item.id?(item.id.charAt(0).toUpperCase()+item.id.slice(1)):'Transfer'}`;
+    const tIcon=TRANSPORT_ICONS[item.id]||<Icons.Car className="w-3.5 h-3.5" />;
+    primary = <span className="flex items-center gap-1.5">{tIcon} {item.id?(item.id.charAt(0).toUpperCase()+item.id.slice(1)):'Transfer'}</span>;
     secondary=item.provider||'';
-    if (item.from&&item.to) tags.push({color:'gray', label:`📍 ${item.from} → ${item.to}`});
-    if (item.pickupDate)    tags.push({color:'amber',label:`📅 ${fmtDate(item.pickupDate)}`});
-    if (item.pickupTime)    tags.push({color:'blue', label:`🕐 Pickup: ${item.pickupTime}`});
-    if (item.duration)      tags.push({color:'gray', label:`⏱ ${item.duration}`});
-    if (item.price)         tags.push({color:'gold', label:item.price});
+    if (item.from&&item.to) tags.push({color:'gray', label: <span className="flex items-center gap-1"><Icons.MapPin className="w-3 h-3"/> {item.from} → {item.to}</span>});
+    if (item.pickupDate)    tags.push({color:'amber', label: <span className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3"/> {fmtDate(item.pickupDate)}</span>});
+    if (item.pickupTime)    tags.push({color:'blue', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> Pickup: {item.pickupTime}</span>});
+    if (item.duration)      tags.push({color:'gray', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> {item.duration}</span>});
+    if (item.price)         tags.push({color:'gold', label: item.price});
   }
   else if (item.type==='restaurant') {
     primary=item.name||'Restaurant';
     secondary=[item.cuisine, item.address||item.cityName].filter(Boolean).join(' · ');
-    if (item.visitDate) tags.push({color:'amber', label:`📅 ${fmtDate(item.visitDate)}`});
-    if (item.visitTime) tags.push({color:'blue',  label:`🕐 ${item.visitTime}`});
-    if (item.rating)    tags.push({color:'green', label:`⭐ ${item.rating}`});
+    if (item.visitDate) tags.push({color:'amber', label: <span className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3"/> {fmtDate(item.visitDate)}</span>});
+    if (item.visitTime) tags.push({color:'blue', label: <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3"/> {item.visitTime}</span>});
+    if (item.rating)    tags.push({color:'green', label: <span className="flex items-center gap-1"><Icons.Star className="w-3 h-3"/> {item.rating}</span>});
   }
   else if (item.type==='attraction') {
     primary=item.name||'Attraction';
     secondary=[item.category, item.cityName].filter(Boolean).join(' · ');
-    if (item.rating) tags.push({color:'green', label:`⭐ ${item.rating}`});
+    if (item.rating) tags.push({color:'green', label: <span className="flex items-center gap-1"><Icons.Star className="w-3 h-3"/> {item.rating}</span>});
   }
   else { primary=item.name||item.id; secondary=item.note||item.provider||''; }
 
@@ -98,7 +112,7 @@ function PlanItem({ item, onRemove, status }) {
 
   return (
     <div className={`border rounded-xl p-3 flex items-start gap-2.5 ${color} shadow-sm ${isPaid ? 'ring-1 ring-green-300 border-green-300' : ''} ${isInvalid ? 'opacity-70' : ''}`}>
-      <span className="text-base flex-shrink-0 mt-0.5">{icon}</span>
+      <span className="text-gray-600 flex-shrink-0 mt-0.5">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="text-xs font-bold text-gray-800 leading-tight flex-1 min-w-0">{primary}</div>
@@ -173,7 +187,7 @@ export function BookView({ planItems, onClose, onPay, viewMode, setViewMode }) {
         />
         
         <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          {item.type === 'flight' && logoSrc ? <img src={logoSrc} style={{ width: '100%', objectFit: 'contain' }} /> : <span>{item.type === 'hotel' ? '🏨' : '📍'}</span>}
+          {item.type === 'flight' && logoSrc ? <img src={logoSrc} style={{ width: '100%', objectFit: 'contain' }} /> : <span className="text-gray-400">{item.type === 'hotel' ? <Icons.Hotel className="w-5 h-5"/> : <Icons.MapPin className="w-5 h-5"/>}</span>}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -301,13 +315,13 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
           {step===0 && (
             <div className="space-y-3">
               {flights.length>0 && (
-                <ModalSection icon="✈️" title="Flights" badge={flights.length} badgeColor="blue">
+                <ModalSection icon={<Icons.Plane className="w-4 h-4"/>} title="Flights" badge={flights.length} badgeColor="blue">
                   {flights.map((f,i)=>(
                     <ModalRow key={i}
                       left={<>
                         <div className="font-semibold text-xs text-gray-800">{f.fromAirport||f.from||'?'} → {f.toAirport||f.to||'?'}</div>
                         <div className="text-[10px] text-gray-400">{[f.airline,f.flightNumber].filter(Boolean).join(' ')} {f.depDate?`· ${fmtDate(f.depDate)}`:''}</div>
-                        <div className="text-[10px] text-gray-500">🕐 {f.depTime||'?'} → {f.arrTime||'?'} · {f.duration||''}</div>
+                        <div className="text-[10px] text-gray-500"><Icons.Clock className="inline w-3 h-3 mr-1"/> {f.depTime||'?'} → {f.arrTime||'?'} · {f.duration||''}</div>
                       </>}
                       right={f.price&&<span className="text-xs font-black text-gray-800">{f.currency||'USD'} {parseFloat(f.price).toLocaleString()}</span>}
                     />
@@ -317,13 +331,13 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
               )}
 
               {hotels.length>0 && (
-                <ModalSection icon="🏨" title="Hotels" badge={hotels.length} badgeColor="amber">
+                <ModalSection icon={<Icons.Hotel className="w-4 h-4"/>} title="Hotels" badge={hotels.length} badgeColor="amber">
                   {hotels.map((h,i)=>(
                     <ModalRow key={i}
                       left={<>
                         <div className="font-semibold text-xs text-gray-800">{h.name}</div>
                         <div className="text-[10px] text-gray-400">{h.address||h.cityName}</div>
-                        <div className="text-[10px] text-gray-500">📅 {fmtDate(h.checkIn)||'—'} · 🌙 {h.nights||1} night{(h.nights||1)>1?'s':''}</div>
+                        <div className="text-[10px] text-gray-500"><Icons.Calendar className="inline w-3 h-3 mr-1"/> {fmtDate(h.checkIn)||'—'} · <Icons.Clock className="inline w-3 h-3 mx-1"/> {h.nights||1} night{(h.nights||1)>1?'s':''}</div>
                       </>}
                       right={h.price
                         ? <span className="text-xs font-black text-gray-800">{h.currency||''} {(parseFloat(h.price)*(Number(h.nights)||1)).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
@@ -335,12 +349,12 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
               )}
 
               {transports.length>0 && (
-                <ModalSection icon="🚗" title="Transfer" badge={transports.length} badgeColor="gray">
+                <ModalSection icon={<Icons.Car className="w-4 h-4"/>} title="Transfer" badge={transports.length} badgeColor="gray">
                   {transports.map((t,i)=>(
                     <ModalRow key={i}
                       left={<>
-                        <div className="font-semibold text-xs text-gray-800">{TRANSPORT_ICONS[t.id]||'🚗'} {t.id?.charAt(0).toUpperCase()+t.id?.slice(1)}</div>
-                        <div className="text-[10px] text-gray-500">📍 {t.from} → {t.to} {t.pickupDate?`· 📅 ${fmtDate(t.pickupDate)}`:''} {t.pickupTime?`· 🕐 ${t.pickupTime}`:''}</div>
+                        <div className="font-semibold text-xs text-gray-800 flex items-center gap-1.5">{TRANSPORT_ICONS[t.id]||<Icons.Car className="w-3.5 h-3.5"/>} {t.id?.charAt(0).toUpperCase()+t.id?.slice(1)}</div>
+                        <div className="text-[10px] text-gray-500"><Icons.MapPin className="inline w-3 h-3 mr-1"/> {t.from} → {t.to} {t.pickupDate?`· ${fmtDate(t.pickupDate)}`:''} {t.pickupTime?`· ${t.pickupTime}`:''}</div>
                       </>}
                       right={t.price&&<span className="text-xs font-bold text-gray-600">{t.price}</span>}
                     />
@@ -349,7 +363,7 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
               )}
 
               {restaurants.length>0 && (
-                <ModalSection icon="🍽️" title="Restaurants" badge={restaurants.length} badgeColor="orange">
+                <ModalSection icon={<Icons.Utensils className="w-4 h-4"/>} title="Restaurants" badge={restaurants.length} badgeColor="orange">
                   {restaurants.map((r,i)=>(
                     <ModalRow key={i}
                       left={<>
@@ -357,9 +371,9 @@ function PaymentModal({ planItems, onClose, onSuccess }) {
                         <div className="text-[10px] text-gray-400">{[r.cuisine, r.address||r.cityName].filter(Boolean).join(' · ')}</div>
                         {(r.visitDate||r.visitTime) && (
                           <div className="text-[10px] text-gray-500 mt-0.5">
-                            {r.visitDate && `📅 ${fmtDate(r.visitDate)}`}
+                            {r.visitDate && <><Icons.Calendar className="inline w-3 h-3 mr-1"/> {fmtDate(r.visitDate)}</>}
                             {r.visitDate && r.visitTime && ' · '}
-                            {r.visitTime && `🕐 ${r.visitTime}`}
+                            {r.visitTime && <><Icons.Clock className="inline w-3 h-3 mr-1"/> {r.visitTime}</>}
                           </div>
                         )}
                       </>}
@@ -594,14 +608,14 @@ export default function PlanPanel({ planItems=[], onRemove, onClose }) {
             {grandTotal>0 && (
               <div className="px-4 py-3 space-y-1.5 border-b border-gray-100">
                 {flightTotal>0 && (
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-gray-500">✈️ Flights</span>
+                  <div className="flex justify-between text-[11px] items-center">
+                    <span className="text-gray-500 flex items-center gap-1.5"><Icons.Plane className="w-3.5 h-3.5 text-blue-500" /> Flights</span>
                     <span className="font-semibold text-gray-700">USD {flightTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
                   </div>
                 )}
                 {hotelTotal>0 && (
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-gray-500">🏨 Hotels</span>
+                  <div className="flex justify-between text-[11px] items-center">
+                    <span className="text-gray-500 flex items-center gap-1.5"><Icons.Hotel className="w-3.5 h-3.5 text-amber-500" /> Hotels</span>
                     <span className="font-semibold text-gray-700">USD {hotelTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
                   </div>
                 )}

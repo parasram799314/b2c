@@ -5,7 +5,8 @@
 // ✅ Fix 4 — "show me flight details" at IDLE now forces flight_search intent
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../../utils/axiosConfig';
+import { Icons } from '../../ui/icons';
 
 const MAX_TOKENS = 2000;
 
@@ -80,7 +81,7 @@ function InlineFlightCard({ flight, onAdd, inPlan }) {
         }}>
           {logoSrc && !imgErr
             ? <img src={logoSrc} alt={airName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImgErr(true)} />
-            : <span style={{ fontSize: '18px' }}>✈</span>}
+            : <Icons.Plane className="w-5 h-5 text-blue-600" />}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: DARK }}>{airName}</div>
@@ -107,7 +108,7 @@ function InlineFlightCard({ flight, onAdd, inPlan }) {
           <div style={{ fontSize: '10px', color: GRAY, marginBottom: '4px' }}>{flight.duration || ''}</div>
           <div style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
             <div style={{ flex: 1, borderBottom: '1.5px dashed #d1d5db' }} />
-            <span style={{ margin: '0 4px', fontSize: '12px', color: GRAY }}>✈</span>
+            <Icons.Plane className="w-3 h-3 mx-1 text-gray-400" />
             <div style={{ flex: 1, borderBottom: '1.5px dashed #d1d5db' }} />
           </div>
           <div style={{
@@ -172,7 +173,8 @@ function InlineHotelCard({ hotel, onAdd, inPlan }) {
           position: 'absolute', top: '6px', left: '6px',
           background: 'rgba(0,0,0,0.55)', color: '#fff',
           fontSize: '10px', fontWeight: 700, borderRadius: '20px', padding: '2px 8px',
-        }}>{stars}⭐</div>
+          display: 'flex', alignItems: 'center', gap: '2px'
+        }}><Icons.Star className="w-2.5 h-2.5" />{stars}</div>
         {price && (
           <div style={{
             position: 'absolute', bottom: '6px', left: '6px',
@@ -185,8 +187,8 @@ function InlineHotelCard({ hotel, onAdd, inPlan }) {
         <div style={{ fontSize: '13px', fontWeight: 700, color: DARK, marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hotel.name}</div>
         <div style={{ fontSize: '11px', color: GRAY, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hotel.address || hotel.cityName}</div>
         {hotel.rating && (
-          <div style={{ fontSize: '11px', color: '#374151', marginBottom: '8px' }}>
-            ⭐ {hotel.rating}{hotel.ratingCount ? ` (${Number(hotel.ratingCount).toLocaleString()})` : ''}
+          <div style={{ fontSize: '11px', color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <Icons.Star className="w-3 h-3 text-yellow-500" /> {hotel.rating}{hotel.ratingCount ? ` (${Number(hotel.ratingCount).toLocaleString()})` : ''}
           </div>
         )}
         <button
@@ -237,9 +239,9 @@ function InlineAttractionCard({ attraction, onAdd, inPlan, type = 'attraction' }
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontSize: '13px', fontWeight: 700, color: DARK, marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attraction.name}</div>
         <div style={{ fontSize: '11px', color: GRAY, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attraction.address || attraction.cityName}</div>
-        {attraction.rating && <div style={{ fontSize: '11px', color: '#374151', marginBottom: '6px' }}>⭐ {attraction.rating}</div>}
-        {attraction.entryFee && <div style={{ fontSize: '11px', color: GRAY, marginBottom: '6px' }}>🎟️ {attraction.entryFee}</div>}
-        {attraction.priceLevel && <div style={{ fontSize: '11px', color: GRAY, marginBottom: '6px' }}>💰 {attraction.priceLevel}</div>}
+        {attraction.rating && <div style={{ fontSize: '11px', color: '#374151', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icons.Star className="w-3 h-3 text-yellow-500" /> {attraction.rating}</div>}
+        {attraction.entryFee && <div style={{ fontSize: '11px', color: GRAY, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icons.Ticket className="w-3 h-3" /> {attraction.entryFee}</div>}
+        {attraction.priceLevel && <div style={{ fontSize: '11px', color: GRAY, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icons.Dollar className="w-3 h-3" /> {attraction.priceLevel}</div>}
         <button
           onClick={() => !inPlan && onAdd?.(attraction, type)}
           disabled={inPlan}
@@ -252,7 +254,7 @@ function InlineAttractionCard({ attraction, onAdd, inPlan, type = 'attraction' }
           onMouseEnter={e => { if (!inPlan) { e.currentTarget.style.background = '#fffbeb'; e.currentTarget.style.borderColor = '#fde68a'; } }}
           onMouseLeave={e => { if (!inPlan) { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.borderColor = '#e5e7eb'; } }}
         >
-          {inPlan ? '✓ Added' : '+ Add to Plan'}
+          {inPlan ? <span className="flex items-center justify-center gap-1"><Icons.Check className="w-3 h-3" /> Added</span> : '+ Add to Plan'}
         </button>
       </div>
     </div>
@@ -263,12 +265,12 @@ function InlineAttractionCard({ attraction, onAdd, inPlan, type = 'attraction' }
 // QUICK PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
 const QUICK_PROMPTS = [
-  { label: '✈️ Flights',       message: 'Show me available flights',          intent: 'flights'     },
-  { label: '🏨 Hotels',        message: 'Show me hotels to stay',             intent: 'hotels'      },
-  { label: '🗺️ Attractions',   message: 'What are the top attractions?',      intent: 'attractions' },
-  { label: '🍽️ Restaurants',   message: 'Best restaurants to try?',           intent: 'restaurants' },
-  { label: '📋 Visa & Docs',   message: 'What visa and documents do I need?', tab: 'checklist'      },
-  { label: '🌤️ Weather & Pack',message: 'What to pack based on the weather?', tab: 'weather'        },
+  { label: <span className="flex items-center gap-1.5"><Icons.Plane className="w-3 h-3" /> Flights</span>,       message: 'Show me available flights',          intent: 'flights'     },
+  { label: <span className="flex items-center gap-1.5"><Icons.Hotel className="w-3 h-3" /> Hotels</span>,        message: 'Show me hotels to stay',             intent: 'hotels'      },
+  { label: <span className="flex items-center gap-1.5"><Icons.MapPin className="w-3 h-3" /> Attractions</span>,   message: 'What are the top attractions?',      intent: 'attractions' },
+  { label: <span className="flex items-center gap-1.5"><Icons.Utensils className="w-3 h-3" /> Restaurants</span>,   message: 'Best restaurants to try?',           intent: 'restaurants' },
+  { label: <span className="flex items-center gap-1.5"><Icons.Checklist className="w-3 h-3" /> Visa & Docs</span>,   message: 'What visa and documents do I need?', tab: 'checklist'      },
+  { label: <span className="flex items-center gap-1.5"><Icons.Cloud className="w-3 h-3" /> Weather & Pack</span>,message: 'What to pack based on the weather?', tab: 'weather'        },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -321,12 +323,12 @@ export default function AIChat({ rfq, onTabSwitch, onResults, onClose }) {
     onResults?.({ planItem: newItem });
 
     const followUps = {
-      hotel:      `**${item.name}** has been added to your plan! 🏨 How many nights are you planning to stay?`,
-      flight:     `**${IATA_NAME[item.airline] || item.airline} ${item.flightNumber || ''}** added! ✈️ How many passengers are traveling?`,
-      attraction: `**${item.name}** added to your plan! 🗺️ Would you like to see more attractions?`,
-      restaurant: `**${item.name}** added to your plan! 🍽️ Would you like more restaurant recommendations?`,
+      hotel:      `**${item.name}** has been added to your plan! How many nights are you planning to stay?`,
+      flight:     `**${IATA_NAME[item.airline] || item.airline} ${item.flightNumber || ''}** added! How many passengers are traveling?`,
+      attraction: `**${item.name}** added to your plan! Would you like to see more attractions?`,
+      restaurant: `**${item.name}** added to your plan! Would you like more restaurant recommendations?`,
     };
-    setMessages(prev => [...prev, { id: Date.now(), role: 'ai', text: followUps[type] || 'Added to plan! ✅' }]);
+    setMessages(prev => [...prev, { id: Date.now(), role: 'ai', text: followUps[type] || 'Added to plan!' }]);
   }, [planItems, onResults]);
 
   // ── Main send ───────────────────────────────────────────────────────────────

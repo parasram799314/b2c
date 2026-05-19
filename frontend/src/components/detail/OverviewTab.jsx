@@ -1,5 +1,6 @@
 // components/detail/OverviewTab.jsx
 import { parseAttractions, extractNotes } from '../../utils/itineraryHelpers';
+import { Icons } from '../../ui/icons';
 
 const DEST_IMAGES = {
   london:    'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&q=80',
@@ -32,7 +33,18 @@ function getDestImage(name) {
   return DEST_IMAGES.default;
 }
 
-const DAY_ICONS = ['🗺️','🏛️','🌿','🎭','🍽️','🏖️','🎨','🌅','🏔️','🛍️'];
+const DAY_ICONS = [
+  <Icons.MapPin className="w-4 h-4" />,
+  <Icons.Landmark className="w-4 h-4" />,
+  <Icons.PalmTree className="w-4 h-4" />,
+  <Icons.Music className="w-4 h-4" />,
+  <Icons.Utensils className="w-4 h-4" />,
+  <Icons.Sparkles className="w-4 h-4" />,
+  <Icons.Map className="w-4 h-4" />,
+  <Icons.Mountain className="w-4 h-4" />,
+  <Icons.ShoppingBag className="w-4 h-4" />,
+  <Icons.Ticket className="w-4 h-4" />,
+];
 
 const Arrow = () => (
   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="flex-shrink-0 opacity-40">
@@ -70,8 +82,8 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
                 <span className="bg-gold-500/90 text-white text-xs font-bold rounded-full px-2.5 py-0.5">
                   {travelType}
                 </span>
-                <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium rounded-full px-2.5 py-0.5">
-                  ✈ {transfer}
+                <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-medium rounded-full px-2.5 py-0.5 flex items-center gap-1">
+                  <Icons.Plane className="w-3 h-3"/> {transfer}
                 </span>
               </div>
               <div className="text-white font-bold text-xl leading-tight">
@@ -106,13 +118,13 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
       {/* ── QUICK INFO STRIP ────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 px-5 py-3 flex items-center gap-6 overflow-x-auto">
         {[
-          { icon: '👤', label: rfq.requireHotels ? `${rfq.numberOfRooms || 1} Room${(rfq.numberOfRooms || 1) > 1 ? 's' : ''}` : `${rfq.numberOfAdults || 1} Adult${(rfq.numberOfAdults || 1) > 1 ? 's' : ''}` },
-          { icon: '🌍', label: rfq.guestCountry || 'India' },
-          { icon: '🏨', label: rfq.requireHotels ? `Hotels Required` : 'No Hotel' },
-          { icon: '⭐', label: rfq.hotelRatings?.length ? `${rfq.hotelRatings.join(', ')}★` : 'Any Rating' },
+          { icon: <Icons.User className="w-4 h-4"/>, label: rfq.requireHotels ? `${rfq.numberOfRooms || 1} Room${(rfq.numberOfRooms || 1) > 1 ? 's' : ''}` : `${rfq.numberOfAdults || 1} Adult${(rfq.numberOfAdults || 1) > 1 ? 's' : ''}` },
+          { icon: <Icons.Globe className="w-4 h-4"/>, label: rfq.guestCountry || 'India' },
+          { icon: <Icons.Hotel className="w-4 h-4"/>, label: rfq.requireHotels ? `Hotels Required` : 'No Hotel' },
+          { icon: <Icons.Star className="w-4 h-4"/>, label: rfq.hotelRatings?.length ? `${rfq.hotelRatings.join(', ')}★` : 'Any Rating' },
         ].map((item, i) => (
           <div key={i} className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-500">
-            <span>{item.icon}</span>
+            <span className="text-gray-400">{item.icon}</span>
             <span className="font-medium text-gray-700">{item.label}</span>
           </div>
         ))}
@@ -212,7 +224,7 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
                         {di === 0 && (
                           <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 mb-0.5 order-first">
                             <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm">✈️</span>
+                              <Icons.Plane className="w-4 h-4 text-blue-500"/>
                             </div>
                             <div>
                               <div className="text-xs font-bold text-gray-800">Day 1 · Travel Day</div>
@@ -232,8 +244,8 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
                   <div className="w-2 h-2 rounded-full bg-gray-300" />
                 </div>
                 <div className="bg-gray-50 rounded-2xl border border-gray-100 p-3 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">🏠</span>
+                  <div className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 text-gray-400">
+                    <Icons.ArrowLeft className="w-4 h-4 rotate-180"/>
                   </div>
                   <div>
                     <div className="text-xs font-bold text-gray-700">Return Journey</div>
@@ -248,7 +260,7 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
         {/* ── TO BE PLANNED ───────────────────────────────────────────── */}
         <div className="bg-gradient-to-br from-gold-50 to-amber-50 rounded-2xl p-4 border border-gold-100">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-base">📌</span>
+            <Icons.MapPin className="w-4 h-4 text-gold-500" />
             <span className="font-bold text-sm text-gray-800">To be planned</span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -270,7 +282,7 @@ export default function OverviewTab({ rfq, days, destNames, totalNights }) {
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 p-4 text-xs text-gray-500 leading-relaxed shadow-sm">
               <div className="flex gap-2">
-                <span className="text-lg flex-shrink-0">📝</span>
+                <Icons.FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 <div>{notes.slice(0, 350)}{notes.length > 350 ? '…' : ''}</div>
               </div>
             </div>

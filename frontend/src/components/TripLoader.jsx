@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Icons } from '../ui/icons';
 
 const LOADING_MESSAGES = [
-  { icon: '✈️', text: 'Preparing your journey...' },
-  { icon: '🗺️', text: 'Mapping your destinations...' },
-  { icon: '🏨', text: 'Finding the best stays...' },
-  { icon: '📋', text: 'Building your itinerary...' },
-  { icon: '🎯', text: 'Almost there...' },
+  { icon: <Icons.Plane className="w-5 h-5 text-amber-500" />, text: 'Preparing your journey...' },
+  { icon: <Icons.MapPin className="w-5 h-5 text-amber-500" />, text: 'Mapping your destinations...' },
+  { icon: <Icons.Hotel className="w-5 h-5 text-amber-500" />, text: 'Finding the best stays...' },
+  { icon: <Icons.Checklist className="w-5 h-5 text-amber-500" />, text: 'Building your itinerary...' },
+  { icon: <Icons.Sparkles className="w-5 h-5 text-amber-500" />, text: 'Almost there...' },
 ];
 
 const FLIGHT_PATH_DOTS = 7;

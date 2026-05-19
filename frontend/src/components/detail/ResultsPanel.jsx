@@ -1,6 +1,7 @@
 // components/detail/ResultsPanel.jsx
 import { useMemo, useState } from 'react';
-import { FaTimes, FaChevronDown, FaChevronUp, FaStar, FaPlane, FaHotel } from 'react-icons/fa';
+import { FaTimes, FaChevronDown, FaChevronUp, FaStar, FaHotel } from 'react-icons/fa';
+import { Icons } from '../../ui/icons';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -436,10 +437,10 @@ function FlightCard({ flight, onAdd, onView }) {
           <div style={styles.flightMeta}>
             {[flight.airline, flight.flight_number].filter(Boolean).join(' · ')}
           </div>
-          <div style={styles.flightTime}>
-            🕐 {flight.departure_time || '?'} → {flight.arrival_time || '?'}
-            {flight.duration ? ` · ⏱ ${flight.duration}` : ''}
-            {flight.stops != null ? ` · ${flight.stops === 0 ? 'Non-stop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}` : ''}
+          <div style={{ ...styles.flightTime, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icons.Clock className="w-3.5 h-3.5 text-blue-500" /> {flight.departure_time || '?'} → {flight.arrival_time || '?'}</span>
+            {flight.duration && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icons.Clock className="w-3.5 h-3.5 text-gray-400" /> {flight.duration}</span>}
+            {flight.stops != null && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icons.Plane className="w-3.5 h-3.5 text-amber-500" /> {flight.stops === 0 ? 'Non-stop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}</span>}
           </div>
         </div>
         <div style={styles.flightPrice}>

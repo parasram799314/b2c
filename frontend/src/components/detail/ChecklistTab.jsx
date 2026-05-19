@@ -1,6 +1,6 @@
 // components/detail/ChecklistTab.jsx
 import { useState } from 'react';
-import axios from 'axios';
+import axios from '../../utils/axiosConfig';
 
 const PRIORITY_COLORS = {
   high:   'bg-red-50 text-red-600 border-red-100',

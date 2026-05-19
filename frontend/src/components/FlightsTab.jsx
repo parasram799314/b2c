@@ -1,6 +1,6 @@
 // components/FlightsTab.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 
 const CITIES = [
   'Indore, India','Mumbai, India','Delhi, India','Bangalore, India',

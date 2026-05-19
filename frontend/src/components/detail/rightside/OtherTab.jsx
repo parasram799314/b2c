@@ -1,15 +1,17 @@
 // components/detail/OtherTab.jsx
 // ─── Replace the existing OtherTab function in DetailPage.jsx with this file ───
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { Icons } from '../../../ui/icons';
 
 const CATEGORIES = [
-  { id: 'Flight',     label: 'Flight',     icon: '✈️' },
-  { id: 'Hotel',      label: 'Hotel',      icon: '🏨' },
-  { id: 'Attraction', label: 'Attraction', icon: '🗺️' },
-  { id: 'Transfer',   label: 'Transfer',   icon: '🚗' },
-  { id: 'Food',       label: 'Food',       icon: '🍽️' },
-  { id: 'Other',      label: 'Other',      icon: '📌' },
+  { id: 'Flight',     label: 'Flight',     icon: <Icons.Plane className="w-4 h-4" /> },
+  { id: 'Hotel',      label: 'Hotel',      icon: <Icons.Hotel className="w-4 h-4" /> },
+  { id: 'Attraction', label: 'Attraction', icon: <Icons.MapPin className="w-4 h-4" /> },
+  { id: 'Transfer',   label: 'Transfer',   icon: <Icons.Car className="w-4 h-4" /> },
+  { id: 'Food',       label: 'Food',       icon: <Icons.Utensils className="w-4 h-4" /> },
+  { id: 'Other',      label: 'Other',      icon: <Icons.More className="w-4 h-4" /> },
 ];
+
 
 function OtherTab({ onAddToPlan }) {
   const [form, setForm] = useState({

@@ -2,7 +2,7 @@
 //  ManagerPage.jsx — Budget approval inline + Trip review full detail
 // ============================================================
 import { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
+import axios from '../../../../utils/axiosConfig';
 import ManagerTripView from './ManagerTripView';
 import { useAuth } from '../context/AuthContext';
 import GroupChatBox from '../../../../components/detail/headings/GroupChatBox';

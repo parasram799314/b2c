@@ -3,6 +3,7 @@
 // Props: budgetApprovals, tripReviews, approvalsLoading, onApprove, onReject, onTripApprove, onTripReject
 import PlanCard from './shared/PlanCard';
 import { useState } from 'react';
+import { Icons } from '../ui/icons';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) =>
@@ -18,11 +19,11 @@ const fmtDate = (d) => {
 };
 
 const TYPE_META = {
-  flight:     { icon: '✈️', label: 'Flight',     bg: '#eff6ff', color: '#1e40af' },
-  hotel:      { icon: '🏨', label: 'Hotel',      bg: '#f0fdf4', color: '#166534' },
-  attraction: { icon: '🗺️', label: 'Attraction', bg: '#fefce8', color: '#854d0e' },
-  transfer:   { icon: '🚗', label: 'Transfer',   bg: '#fdf4ff', color: '#6b21a8' },
-  other:      { icon: '📌', label: 'Other',      bg: '#fff7ed', color: '#9a3412' },
+  flight:     { icon: <Icons.Plane className="w-4 h-4" />,     label: 'Flight',     bg: '#eff6ff', color: '#1e40af' },
+  hotel:      { icon: <Icons.Hotel className="w-4 h-4" />,      label: 'Hotel',      bg: '#f0fdf4', color: '#166534' },
+  attraction: { icon: <Icons.MapPin className="w-4 h-4" />, label: 'Attraction', bg: '#fefce8', color: '#854d0e' },
+  transfer:   { icon: <Icons.Car className="w-4 h-4" />,   label: 'Transfer',   bg: '#fdf4ff', color: '#6b21a8' },
+  other:      { icon: <Icons.More className="w-4 h-4" />,      label: 'Other',      bg: '#fff7ed', color: '#9a3412' },
 };
 
 // ── PlanItemRow — compact card for trip review items ─────────────────────────
@@ -197,8 +198,8 @@ function BudgetApprovalCard({ approval, onApprove, onReject }) {
               borderTop: '1px solid #f3f4f6', cursor: 'pointer',
             }}
           >
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
-              🗒 View {approval.planItems.length} plan item{approval.planItems.length !== 1 ? 's' : ''}
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icons.Checklist className="w-3.5 h-3.5" /> View {approval.planItems.length} plan item{approval.planItems.length !== 1 ? 's' : ''}
             </span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
               <path d="M6 9l6 6 6-6"/>
@@ -330,8 +331,8 @@ function TripReviewCard({ trip, onApprove, onReject }) {
               borderTop: '1px solid #f3f4f6', cursor: 'pointer',
             }}
           >
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>
-              🗒 Review {planItems.length} plan item{planItems.length !== 1 ? 's' : ''}
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icons.Checklist className="w-3.5 h-3.5" /> Review {planItems.length} plan item{planItems.length !== 1 ? 's' : ''}
             </span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
               <path d="M6 9l6 6 6-6"/>
@@ -375,8 +376,8 @@ export default function ManagerApprovalsSection({
   const totalPending = budgetApprovals.length + tripReviews.length;
 
   const tabs = [
-    { id: 'approvals', label: '🔔 Approvals', count: totalPending },
-    { id: 'history',   label: '📋 History',   count: historyItems.length },
+    { id: 'approvals', label: <span className="flex items-center gap-1.5"><Icons.Bell className="w-4 h-4" /> Approvals</span>, count: totalPending },
+    { id: 'history',   label: <span className="flex items-center gap-1.5"><Icons.Clock className="w-4 h-4" /> History</span>, count: historyItems.length },
   ];
 
   return (
@@ -415,7 +416,7 @@ export default function ManagerApprovalsSection({
         <div>
           {totalPending === 0 ? (
             <div style={{ background: '#fff', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', border: '1.5px dashed #e5e7eb' }}>
-              <div style={{ fontSize: '28px', marginBottom: '10px' }}>🎉</div>
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Icons.Party className="w-8 h-8 text-gold-500" /></div>
               <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No pending approvals</div>
               <div style={{ fontSize: '11px', color: '#9ca3af' }}>All caught up!</div>
             </div>
@@ -425,7 +426,7 @@ export default function ManagerApprovalsSection({
               {budgetApprovals.length > 0 && (
                 <>
                   <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>💰 Budget Approvals</span>
+                    <span className="flex items-center gap-1.5"><Icons.Dollar className="w-3.5 h-3.5" /> Budget Approvals</span>
                     <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: '20px', fontSize: '10px' }}>{budgetApprovals.length}</span>
                   </div>
                   {budgetApprovals.map(approval => (
@@ -438,7 +439,7 @@ export default function ManagerApprovalsSection({
               {tripReviews.length > 0 && (
                 <>
                   <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', marginTop: budgetApprovals.length > 0 ? '20px' : '0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>✈️ Trip Reviews</span>
+                    <span className="flex items-center gap-1.5"><Icons.Plane className="w-3.5 h-3.5" /> Trip Reviews</span>
                     <span style={{ background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: '20px', fontSize: '10px' }}>{tripReviews.length}</span>
                   </div>
                   {tripReviews.map(trip => (
@@ -456,7 +457,7 @@ export default function ManagerApprovalsSection({
         <div>
           {historyItems.length === 0 ? (
             <div style={{ background: '#fff', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', border: '1.5px dashed #e5e7eb' }}>
-              <div style={{ fontSize: '28px', marginBottom: '10px' }}>📋</div>
+              <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}><Icons.Checklist className="w-8 h-8 text-gray-300" /></div>
               <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>No history yet</div>
               <div style={{ fontSize: '11px', color: '#9ca3af' }}>Approved/Rejected items will appear here</div>
             </div>
@@ -473,7 +474,7 @@ export default function ManagerApprovalsSection({
                   background: item.status === 'approved' ? '#dcfce7' : '#fee2e2',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
                 }}>
-                  {item.status === 'approved' ? '✅' : '❌'}
+                  {item.status === 'approved' ? <Icons.Check className="w-5 h-5 text-green-600" /> : <Icons.X className="w-5 h-5 text-red-600" />}
                 </div>
 
                 {/* Trip Info */}
@@ -488,8 +489,9 @@ export default function ManagerApprovalsSection({
                       background: item.type === 'budget' ? '#fef3c7' : '#dbeafe',
                       color: item.type === 'budget' ? '#92400e' : '#1e40af',
                       border: `1px solid ${item.type === 'budget' ? '#fde68a' : '#bfdbfe'}`,
+                      display: 'flex', alignItems: 'center', gap: '4px'
                     }}>
-                      {item.type === 'budget' ? '💰 BUDGET' : '✈️ TRIP REVIEW'}
+                      {item.type === 'budget' ? <><Icons.Dollar className="w-2.5 h-2.5" /> BUDGET</> : <><Icons.Plane className="w-2.5 h-2.5" /> TRIP REVIEW</>}
                     </span>
                     {item.rfqId && (
                       <span style={{ fontSize: '10px', fontWeight: 700, background: '#f3f4f6', color: '#6b7280', padding: '2px 6px', borderRadius: '4px' }}>
@@ -498,9 +500,9 @@ export default function ManagerApprovalsSection({
                     )}
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <span>🕐 {fmtDate(item.resolvedAt || item.updatedAt)}</span>
-                    {item.managerComment && <span>💬 "{item.managerComment}"</span>}
-                    {item.approvedBudget && <span>💰 {fmt(item.approvedBudget)}</span>}
+                    <span className="flex items-center gap-1"><Icons.Clock className="w-3 h-3" /> {fmtDate(item.resolvedAt || item.updatedAt)}</span>
+                    {item.managerComment && <span className="flex items-center gap-1"><Icons.Message className="w-3 h-3" /> "{item.managerComment}"</span>}
+                    {item.approvedBudget && <span className="flex items-center gap-1"><Icons.Dollar className="w-3 h-3" /> {fmt(item.approvedBudget)}</span>}
                   </div>
                 </div>
 
