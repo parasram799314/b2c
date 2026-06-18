@@ -15,13 +15,30 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // 1. Check if there's a token in the URL (Session Sharing from Dashboard)
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
+    const currentHref = window.location.href;
+    let urlToken = null;
+    let cleanUrl = window.location.pathname;
+
+    if (currentHref.includes('token=')) {
+      const parts = currentHref.split('token=');
+      urlToken = parts[1].split(/[?&]/)[0]; // Extract token and ignore other params
+      // Get the part before 'token=' and remove trailing ? or &
+      const baseUrlPart = parts[0].replace(/[?&]$/, '');
+      try {
+        const urlObj = new URL(baseUrlPart);
+        cleanUrl = urlObj.pathname;
+      } catch (e) {
+        cleanUrl = baseUrlPart.split(window.location.host).pop() || '/';
+      }
+    } else {
+      const params = new URLSearchParams(window.location.search);
+      urlToken = params.get('token');
+    }
     
     if (urlToken) {
       localStorage.setItem('fb_token', urlToken);
-      // Clean URL to keep it pretty
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clean URL to keep it pretty and prevent infinite loops
+      window.history.replaceState({}, document.title, cleanUrl);
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
