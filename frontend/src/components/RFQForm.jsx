@@ -394,10 +394,16 @@ function HotelSection({ hCity, setHCity, onOpenHCal, hCI, hCO, totalTravelers })
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────
-export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan, onOpenDetail }) {
+export default function RFQForm({ onSubmit, loading, error, onExpandChange, onAddToPlan, onOpenDetail }) {
   const [expanded,   setExpanded]   = useState(false);
   const [showLoader, setShowLoader] = useState(false);  
   const formRef = useRef();
+
+  useEffect(() => {
+    if (!loading && expanded) {
+      setShowLoader(false);
+    }
+  }, [loading, expanded]);
 
   useEffect(()=>{
     document.body.style.overflow = expanded ? 'hidden' : '';
@@ -405,7 +411,7 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   },[expanded]);
 
   const doExpand   = ()=>{ setExpanded(true);  onExpandChange?.(true);  };
-  const doCollapse = ()=>{ setExpanded(false); onExpandChange?.(false); };
+  const doCollapse = ()=>{ setExpanded(false); onExpandChange?.(false); setShowLoader(false); };
 
   const [travelType, setTravelType] = useState('business');
   const [activeTab,  setActiveTab]  = useState('Trip Planner');
@@ -485,26 +491,25 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
   const canTrip = destinations[0]?.city.trim() !== "";
   const canHotel = hCity.trim() !== "";
 
-  // ✅ FIX: _id nahi bhej rahe — rfqId alag field hai
-  // MongoDB apna khud ka ObjectId _id generate karega
-  const handleTripCreate = (aiMode=false) => {
+  // ✅ Unified Submit Handler
+  const handleFinalSubmit = (aiMode=false) => {
     if(!canTrip) return;
     const rfq = {
-      rfqId,                    // ✅ "A24CIM" — display ID, MongoDB _id se alag
+      rfqId,                    
       from,
       tripName,
       depDate: depDate || new Date().toISOString().split('T')[0],
       destinations: destinations.map(d => ({
         destination:   d.city,
         dateOfArrival: d.arrivalDate || new Date().toISOString().split('T')[0],
-        numberOfNights: d.nights,    // ✅ model field name: numberOfNights
+        numberOfNights: d.nights,    
       })),
       numberOfAdults:   adults,
       numberOfChildren: children,
       numberOfInfants:  infants,
       travelClass:      tClass,
-      travelType,               // business | personal
-      tripType:         travelType, // mapped for consistency with backend field name
+      travelType,               
+      tripType:         travelType, 
       budget,
       reviewer:         tripReviewer,
       note,
@@ -514,7 +519,6 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
       status:           'draft',
     };
     setShowLoader(true);
-    doCollapse();
     onSubmit?.(rfq);
   };
 
@@ -534,15 +538,41 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
           </div>
           {travelType==='personal'&&<span style={{fontSize:'12px',color:'#D97706',fontWeight:600,cursor:'pointer'}} onClick={()=>setShowPrivacy(true)}>🔒 Private · Learn more</span>}
         </div>
-        <div style={{maxWidth:'460px'}}>
+        <div style={{maxWidth:'100%'}}>
           <div onClick={doExpand}
-            style={{display:'flex',alignItems:'center',gap:'10px',border:'2px solid #e5e7eb',borderRadius:'999px',padding:'8px 8px 8px 18px',background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.07)',cursor:'pointer',transition:'border-color 0.2s,box-shadow 0.2s'}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='#fcd34d';e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)';}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='#e5e7eb';e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.07)';}}>
-            <span style={{fontSize:'18px',flexShrink:0}}>📍</span>
-            <span style={{flex:1,fontSize:'14px',color:'#9ca3af',userSelect:'none'}}>Where do you want to go?</span>
-            <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'#F5A623',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 4px 14px rgba(245,166,35,0.45)'}}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            style={{
+              display:'flex', alignItems:'center', gap:'12px', border:'1px solid #e5e7eb', 
+              borderRadius:'20px', padding:'10px 10px 10px 24px', background:'#fff', 
+              boxShadow:'0 10px 25px rgba(0,0,0,0.05)', cursor:'pointer', transition:'all 0.3s ease'
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='#F5A623'; e.currentTarget.style.boxShadow='0 15px 35px rgba(245,166,35,0.15)'; e.currentTarget.style.transform='translateY(-2px)';}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='#e5e7eb'; e.currentTarget.style.boxShadow='0 10px 25px rgba(0,0,0,0.05)'; e.currentTarget.style.transform='translateY(0)';}}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: '140px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Destination</span>
+                <span style={{ fontSize: '14px', color: '#111827', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Where to?</span>
+              </div>
+              <div style={{ width: '1px', height: '24px', background: '#e5e7eb', flexShrink: 0 }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: '100px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dates</span>
+                <span style={{ fontSize: '14px', color: '#9ca3af', fontWeight: 500 }}>Add dates</span>
+              </div>
+              <div style={{ width: '1px', height: '24px', background: '#e5e7eb', flexShrink: 0 }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: '100px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Guests</span>
+                <span style={{ fontSize: '14px', color: '#9ca3af', fontWeight: 500 }}>Add guests</span>
+              </div>
+            </div>
+            <div style={{
+              width:'48px', height:'48px', borderRadius:'16px', background:'#F5A623', 
+              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, 
+              boxShadow:'0 8px 20px rgba(245,166,35,0.3)', transition: 'all 0.2s'
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
             </div>
           </div>
         </div>
@@ -713,21 +743,21 @@ export default function RFQForm({ onSubmit, loading, onExpandChange, onAddToPlan
                   {/* ✅ Create Trip button */}
                   <div style={{ marginTop:'24px', display:'flex', justifyContent:'flex-end' }}>
                     <button
-                      onClick={() => handleTripCreate(false)}
-                      disabled={!canTrip}
+                      onClick={() => handleFinalSubmit(false)}
+                      disabled={!canTrip || loading}
                       style={{
                         padding:'12px 32px', fontSize:'14px', fontWeight:800,
-                        background: canTrip ? '#F5A623' : '#f3f4f6',
-                        color: canTrip ? '#fff' : '#9ca3af',
+                        background: (canTrip && !loading) ? '#F5A623' : '#f3f4f6',
+                        color: (canTrip && !loading) ? '#fff' : '#9ca3af',
                         border:'none', borderRadius:'12px',
-                        cursor: canTrip ? 'pointer' : 'not-allowed',
-                        boxShadow: canTrip ? '0 4px 14px rgba(245,166,35,0.4)' : 'none',
+                        cursor: (canTrip && !loading) ? 'pointer' : 'not-allowed',
+                        boxShadow: (canTrip && !loading) ? '0 4px 14px rgba(245,166,35,0.4)' : 'none',
                         transition:'all 0.2s',
                       }}
-                      onMouseEnter={e=>{ if(canTrip) e.currentTarget.style.background='#E09510'; }}
-                      onMouseLeave={e=>{ if(canTrip) e.currentTarget.style.background='#F5A623'; }}
+                      onMouseEnter={e=>{ if(canTrip && !loading) e.currentTarget.style.background='#E09510'; }}
+                      onMouseLeave={e=>{ if(canTrip && !loading) e.currentTarget.style.background='#F5A623'; }}
                     >
-                      Create Trip →
+                      {loading ? 'Creating...' : 'Create Trip →'}
                     </button>
                   </div>
                 </div>

@@ -26,6 +26,74 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
+// RFQ Router Internal Logger
+router.use((req, res, next) => {
+  console.log(`[RFQ Router] ${req.method} ${req.url}`);
+  next();
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COLLABORATION ROUTES
+// ════════════════════════════════════════════════════════════════════════════
+
+router.get('/ping', (req, res) => {
+  console.log('[RFQ/Ping] Hit!');
+  res.json({ success: true, message: 'pong from RFQ router' });
+});
+
+// Generate or get invite link
+router.post('/:id/invite', verifyToken, async (req, res) => {
+  try {
+    console.log(`[RFQ/Invite] Request for ID: ${req.params.id} by user: ${req.uid}`);
+    const rfq = await RFQ.findById(req.params.id);
+    if (!rfq) {
+      console.log(`[RFQ/Invite] RFQ not found in DB: ${req.params.id}`);
+      return res.status(404).json({ success: false, message: 'Trip not found' });
+    }
+
+    if (!rfq.inviteCode) {
+      rfq.inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      await rfq.save();
+    }
+
+    console.log(`[RFQ/Invite] Success! inviteCode=${rfq.inviteCode}`);
+    res.json({ success: true, inviteCode: rfq.inviteCode });
+  } catch (error) {
+    console.error('[RFQ/Invite] Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Join trip via invite code
+router.post('/join/:inviteCode', verifyToken, async (req, res) => {
+  try {
+    const { inviteCode } = req.params;
+    console.log(`[RFQ/Join] User ${req.uid} joining with code: ${inviteCode}`);
+    const userDoc = await User.findOne({ uid: req.uid });
+    if (!userDoc) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const rfq = await RFQ.findOne({ inviteCode });
+    if (!rfq) return res.status(404).json({ success: false, message: 'Invalid invite code' });
+
+    // Check if already a collaborator
+    const isCollaborator = rfq.collaborators.some(c => c.uid === req.uid);
+    if (!isCollaborator) {
+      rfq.collaborators.push({
+        uid: userDoc.uid,
+        email: userDoc.email,
+        name: userDoc.name || 'Collaborator',
+        role: 'editor'
+      });
+      await rfq.save();
+    }
+
+    res.json({ success: true, data: rfq });
+  } catch (error) {
+    console.error('[RFQ/Join] Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 //  UTILITY HELPERS
 // ════════════════════════════════════════════════════════════════════════════
@@ -187,8 +255,6 @@ async function buildWeatherData(rfqData) {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EXTRACT RFQ PRE-FILL
-//  Builds the rfqPreFill object from an RFQ document so the chat bot
-//  can answer "show me flights" without asking anything.
 // ════════════════════════════════════════════════════════════════════════════
 function extractRfqPreFill(rfq) {
   if (!rfq) return {};
@@ -213,46 +279,69 @@ router.post('/', verifyToken, async (req, res) => {
     const { _id, __v, ...rfqData } = req.body;
     const finalRfqId = rfqData.rfqId || generateStandardId();
 
+    console.log(`[RFQ/Create] User ${createdBy} creating trip ${finalRfqId}`);
+
+    // Filter out empty destinations to avoid Mongoose validation errors
+    const validDestinations = (rfqData.destinations || []).filter(d => d.destination && d.dateOfArrival);
+    const cleanRfqData = { ...rfqData, destinations: validDestinations };
+
+    // Run AI and data tasks with individual error handling
     const [
-      { itinerary, travelType, modeOfTransport },
+      itineraryResult,
       destinationData,
       weather,
     ] = await Promise.all([
-      generateItinerary(rfqData),
-      buildDestinationData(rfqData),
-      buildWeatherData(rfqData),
+      generateItinerary(cleanRfqData).catch(err => {
+        console.error('[RFQ/Create] AI Itinerary failed:', err.message);
+        return { itinerary: 'AI generation failed. Please try "Regenerate" or update manually.', travelType: 'personal', modeOfTransport: 'Flight' };
+      }),
+      buildDestinationData(cleanRfqData).catch(err => {
+        console.error('[RFQ/Create] Destination data failed:', err.message);
+        return [];
+      }),
+      buildWeatherData(cleanRfqData).catch(err => {
+        console.error('[RFQ/Create] Weather failed:', err.message);
+        return null;
+      }),
     ]);
 
     const checklistResult = buildChecklist({
       guestCountry:  rfqData.guestCountry || 'India',
-      destinations:  rfqData.destinations || [],
-      requireHotels: true,
+      destinations:  validDestinations,
+      requireHotels: rfqData.requireHotels ?? true,
     });
 
-    const rawTripType = (rfqData.tripType || rfqData.travelType || travelType || 'personal').toLowerCase();
+    const rawTripType = (rfqData.tripType || rfqData.travelType || itineraryResult.travelType || 'personal').toLowerCase();
     const normalizedTripType = rawTripType.includes('business') ? 'business' : 'personal';
 
     const rfq = new RFQ({
-      ...rfqData,
+      ...cleanRfqData,
       rfqId:          finalRfqId,
       createdBy,
       assignedTo,
-      requireHotels:  true,
-      itinerary:      `Trip ID: ${finalRfqId}\n\n` + itinerary,
-      travelType:     rfqData.travelType || travelType,
+      requireHotels:  rfqData.requireHotels ?? true,
+      itinerary:      `Trip ID: ${finalRfqId}\n\n` + itineraryResult.itinerary,
+      travelType:     rfqData.travelType || itineraryResult.travelType,
       tripType:       normalizedTripType,
-      modeOfTransport,
+      modeOfTransport: itineraryResult.modeOfTransport,
       destinationData,
       weather,
       checklist:      checklistResult.checklist,
       checklistStats: checklistResult.stats,
       visaInfo:       mapVisaInfo(checklistResult.visaInfo),
+      collaborators: [{
+        uid: userDoc?.uid || createdBy,
+        email: userDoc?.email || '',
+        name: userDoc?.name || 'Creator',
+        role: 'admin'
+      }]
     });
 
     await rfq.save();
+    console.log(`[RFQ/Create] Success! Created trip ${rfq._id}`);
     res.status(201).json({ success: true, data: rfq });
   } catch (error) {
-    console.error('RFQ creation error:', error);
+    console.error('[RFQ/Create] Fatal Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -584,9 +673,13 @@ router.get('/', verifyToken, async (req, res) => {
       filter.$or = [
         { createdBy: req.uid },
         { assignedTo: req.uid, reviewStatus: 'sent' },
+        { 'collaborators.uid': req.uid }
       ];
     } else {
-      filter.createdBy = req.uid;
+      filter.$or = [
+        { createdBy: req.uid },
+        { 'collaborators.uid': req.uid }
+      ];
     }
 
     if (pendingTripReview === 'true') {

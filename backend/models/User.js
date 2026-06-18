@@ -7,8 +7,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   role: {
     type: String,
-    enum: ['hr', 'manager', 'employee', 'admin'],
-    default: 'employee',
+    enum: ['hr', 'manager', 'employee', 'admin', 'user'],
+    default: 'user',
   },
   managerId: { type: String, default: null },
   companyId: { type: String, default: '' },

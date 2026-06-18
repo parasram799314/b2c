@@ -28,6 +28,39 @@ function UserApp({ onOpenHRDashboard, onOpenManagerPanel, onOpenAdminDashboard }
 
   console.log('[App] Rendering with itineraries:', itineraries.map(r => ({_id: r._id, planItems: r.planItems?.length || 0})));
 
+// ── JOIN TRIP HANDLER ──
+useEffect(() => {
+  if (authLoading || !user) return;
+  
+  const path = window.location.pathname;
+  if (path.startsWith('/join/')) {
+    const inviteCode = path.split('/join/')[1];
+    if (inviteCode) {
+      const joinTrip = async () => {
+        try {
+          const res = await axios.post(`/api/rfqs/join/${inviteCode}`);
+          if (res.data?.success) {
+            const joinedRfq = res.data.data;
+            setItineraries(prev => {
+              if (prev.find(it => it._id === joinedRfq._id)) return prev;
+              return [joinedRfq, ...prev];
+            });
+            setCurrentRfq(joinedRfq);
+            setPage('detail');
+            // Clean up URL
+            window.history.replaceState(null, '', '/');
+          }
+        } catch (err) {
+          console.error('Join failed:', err);
+          alert('Failed to join trip: ' + (err.response?.data?.message || 'Invalid or expired link'));
+          window.history.replaceState(null, '', '/');
+        }
+      };
+      joinTrip();
+    }
+  }
+}, [user, authLoading]);
+
 // 1. Initial Load from MongoDB Atlas
 useEffect(() => {
   if (authLoading) return;
@@ -63,8 +96,9 @@ const handleSubmit = async (formData) => {
     setCurrentRfq(newRfq);
     setPage('detail');
   } catch (err) {
-    console.error('RFQ creation failed:', err.message);
-    setError('Failed to create itinerary. Please try again.');
+    console.error('RFQ creation failed:', err);
+    const backendMsg = err.response?.data?.message || err.message;
+    setError(`Failed to create itinerary: ${backendMsg}`);
   }
   setLoading(false);
 };

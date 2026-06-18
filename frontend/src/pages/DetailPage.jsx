@@ -1271,9 +1271,18 @@ useEffect(() => {
         if (res.data?.success && res.data.data) {
           const latest = res.data.data;
           console.log(`[DetailPage] Re-fetched latest data for ${latest._id}. Items: ${latest.planItems?.length || 0}`);
+          
+          // Only update if backend is different to avoid overwriting local unsynced changes
           setRfq(latest);
           if (Array.isArray(latest.planItems)) {
-            setPlanItems(latest.planItems);
+            // Simple check: if lengths are different, or we want to be sure, update.
+            // In a real app, we'd use timestamps or deep comparison.
+            setPlanItems(prev => {
+              if (JSON.stringify(prev) !== JSON.stringify(latest.planItems)) {
+                return latest.planItems;
+              }
+              return prev;
+            });
           }
           if (onUpdate) onUpdate(latest);
         }
@@ -1282,6 +1291,10 @@ useEffect(() => {
       }
     };
     loadLatest();
+
+    // Collaboration Polling
+    const pollInterval = setInterval(loadLatest, 5000);
+    return () => clearInterval(pollInterval);
   }, [initialRfq?._id]); // Only runs when trip ID changes
 
   // Effect to sync planItems with backend (optional: debounce for performance)
@@ -1451,7 +1464,12 @@ const journeyCities = useMemo(() => {
     const id = item.id || (item.type + '_' + Date.now());
     setPlanItems(prev => {
       if (prev.find(p => p.id === id)) return prev;
-      const next = [...prev, { ...item, id, status: item.status || 'pending' }];
+      const next = [...prev, { 
+        ...item, 
+        id, 
+        status: item.status || 'pending',
+        addedBy: userProfile?.name || profile?.fullName || 'Collaborator'
+      }];
       saveItems(next);
       return next;
     });
@@ -1899,7 +1917,13 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
   <div style={{ width:'1px', height:'22px', background:'#e5e7eb' }} />
 
   {/* Avatars */}
-  <PermissionAvatars />
+  <PermissionAvatars 
+    collaborators={rfq?.collaborators || []} 
+    rfqId={rfq?._id} 
+    onInviteClick={(url) => {
+      // Optional: show a custom notification if needed
+    }}
+  />
 
   {/* Group Chat */}
   <button

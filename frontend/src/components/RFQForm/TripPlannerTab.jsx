@@ -720,20 +720,20 @@ Use sensible defaults if data is missing (adults: 1, children: 0, infants: 0, tr
           )}
         </button>
       ) : (
-        <button onClick={handleSubmit} disabled={!canTrip}
+        <button onClick={handleSubmit} disabled={!canTrip || loading}
           style={{
             display:'flex', alignItems:'center', gap:'8px',
             padding:'12px 28px', borderRadius:'10px', border:'none', fontFamily:'inherit',
-            background: canTrip ? '#F5A623' : '#f3f4f6',
-            color: canTrip ? '#fff' : '#9ca3af',
+            background: (canTrip && !loading) ? '#F5A623' : '#f3f4f6',
+            color: (canTrip && !loading) ? '#fff' : '#9ca3af',
             fontSize:'14px', fontWeight:700,
-            cursor: canTrip ? 'pointer' : 'not-allowed',
-            boxShadow: canTrip ? '0 6px 20px rgba(245,166,35,0.35)' : 'none',
+            cursor: (canTrip && !loading) ? 'pointer' : 'not-allowed',
+            boxShadow: (canTrip && !loading) ? '0 6px 20px rgba(245,166,35,0.35)' : 'none',
             transition:'all 0.2s',
           }}
-          onMouseEnter={e => { if(canTrip) e.currentTarget.style.background='#E09510'; }}
-          onMouseLeave={e => { if(canTrip) e.currentTarget.style.background='#F5A623'; }}>
-          <IcoNote size={14}/> Next
+          onMouseEnter={e => { if(canTrip && !loading) e.currentTarget.style.background='#E09510'; }}
+          onMouseLeave={e => { if(canTrip && !loading) e.currentTarget.style.background='#F5A623'; }}>
+          <IcoNote size={14}/> {loading ? 'Creating...' : 'Next'}
         </button>
       )}
     </div>

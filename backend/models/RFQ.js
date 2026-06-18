@@ -141,10 +141,9 @@ const destDataSchema = new mongoose.Schema({
 // ── Main RFQ schema ───────────────────────────────────────────────────────
 const rfqSchema = new mongoose.Schema(
   {
-    // Frontend se aane wala short human-readable ID (e.g. "A24CIM")
     rfqId: { type: String, default: '' },
-tripName: { type: String, default: '' },
-budget:   { type: Number, default: 0  },
+    tripName: { type: String, default: '' },
+    budget:   { type: Number, default: 0  },
     destinations: [destinationSchema],
 
     requireHotels: { type: Boolean, default: false },
@@ -181,26 +180,37 @@ budget:   { type: Number, default: 0  },
       highPriority: { type: Number, default: 0 },
     },
 
-    reviewStatus:  { type: String, default: 'draft' }, // draft | sent | approved | rejected
-    reviewSentAt:  { type: String, default: '' },
+    reviewStatus:     { type: String, default: 'draft' }, // draft | sent | approved | rejected
+    reviewSentAt:     { type: String, default: '' },
     reviewApprovedAt: { type: String, default: '' },
-    reviewPayload: { type: mongoose.Schema.Types.Mixed, default: null },
-    planItems:     { type: [mongoose.Schema.Types.Mixed], default: [] },
-    tripType:      { type: String, enum: ['business', 'personal'], default: 'business' },
+    reviewPayload:    { type: mongoose.Schema.Types.Mixed, default: null },
+    planItems:        { type: [mongoose.Schema.Types.Mixed], default: [] },
+    tripType:         { type: String, enum: ['business', 'personal'], default: 'personal' },
     
-    createdBy:  { type: String, default: '' }, // Firebase UID
-assignedTo: { type: String, default: '' }, // Manager ka Firebase UID
-companyId:  { type: String, default: '' },
+    // Collaboration
+    collaborators: [{
+      uid: { type: String },
+      email: { type: String },
+      name: { type: String },
+      role: { type: String, enum: ['admin', 'editor', 'viewer'], default: 'editor' },
+      joinedAt: { type: Date, default: Date.now }
+    }],
+    inviteCode: { type: String, unique: true, sparse: true },
+
+    createdBy:  { type: String, default: '' },
+    assignedTo: { type: String, default: '' },
+    companyId:  { type: String, default: '' },
+
+    // Merged Trips
+    isMerged:   { type: Boolean, default: false },
+    mergedFrom: { type: [String], default: [] },
 
     // Visa info
-   
-   visaInfo: {
-  required:  { type: Boolean },
-  visaType:  { type: String },   // 'type' → 'visaType'
-  label:     { type: String },
-  isMerged:   { type: Boolean, default: false },
-mergedFrom: { type: [String], default: [] },
-},
+    visaInfo: {
+      required: { type: Boolean },
+      visaType: { type: String },
+      label:    { type: String },
+    },
   },
   { timestamps: true }
 );

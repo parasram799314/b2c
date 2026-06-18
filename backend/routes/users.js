@@ -10,13 +10,16 @@ router.post('/sync', verifyToken, async (req, res) => {
   try {
     let user = await User.findOne({ uid: req.uid });
     if (!user) {
+      // NEW: Auto-create user with email prefix as name and 'user' role
+      const defaultName = req.email ? req.email.split('@')[0] : 'User';
       user = await User.create({
         uid: req.uid,
         email: req.email,
-        name: req.body.name || '',
-        role: 'employee',
+        name: req.body.name || defaultName,
+        role: 'user',
+        createdAt: new Date(),
       });
-   } else if (req.body.name) {
+    } else if (req.body.name && !user.name) {
       // Name update karein agar backend mein empty hai
       user.name = req.body.name;
       await user.save();

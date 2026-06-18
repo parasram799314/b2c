@@ -144,8 +144,8 @@ export default function HeaderProfileMenu({
           {/* ── TOP SECTION: big avatar, name, email, quick actions ── */}
           <div style={{
             padding: '22px 20px 18px',
-            background: 'linear-gradient(170deg, #eef2ff 0%, #e8efff 100%)',
-            borderBottom: '1px solid #e4e4e4',
+            background: 'linear-gradient(170deg, #fffcf0 0%, #fff9e6 100%)',
+            borderBottom: '1px solid #f3f4f6',
             textAlign: 'center',
             position: 'relative',
           }}>
@@ -155,24 +155,24 @@ export default function HeaderProfileMenu({
               style={{
                 position: 'absolute', top: '10px', right: '10px',
                 width: '28px', height: '28px', borderRadius: '50%',
-                background: 'rgba(0,0,0,0.06)', border: 'none', cursor: 'pointer',
+                background: 'rgba(0,0,0,0.04)', border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.13)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
             >
-              <IconClose size={13} color="#555" />
+              <IconClose size={13} color="#666" />
             </button>
 
             {/* Large Avatar */}
             <div style={{
               width: '76px', height: '76px', borderRadius: '50%', margin: '0 auto 14px',
-              background: 'linear-gradient(135deg, rgb(247,190,57) 0%, #c47f06 100%)',
+              background: 'linear-gradient(135deg, rgb(247,190,57) 0%, #d9920a 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '28px', fontWeight: 800, color: '#1a1a1a',
               letterSpacing: '-1px',
-              boxShadow: '0 0 0 4px rgba(255,255,255,0.9), 0 4px 18px rgba(247,190,57,0.45)',
+              boxShadow: '0 0 0 4px #fff, 0 4px 18px rgba(247,190,57,0.4)',
             }}>
               {initials}
             </div>

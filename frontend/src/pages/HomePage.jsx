@@ -208,6 +208,15 @@ export default function HomePage({
   const [page, setPage]             = useState(1);
   const [activeProfile, setActiveProfile] = useState('business');
   const [showApprovals, setShowApprovals] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const pageSize     = 6;
   const totalPages   = Math.max(1, Math.ceil(itineraries.length / pageSize));
@@ -215,7 +224,17 @@ export default function HomePage({
   const visibleItins = itineraries.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-gray-900">
+    <div className="min-h-screen flex flex-col bg-white text-gray-900">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+        .animate-fade-in-up {
+          animation: fadeInUp 0.8s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
 {showTripsPage && (
   <TripsPage
@@ -230,67 +249,84 @@ export default function HomePage({
   />
 )}
       {/* ── HEADER ── */}
-      <header className="w-full z-30 sticky top-0" style={{ backgroundColor: 'rgb(247, 190, 57)' }}>
-        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
+      <header 
+        className="w-full z-[100] sticky top-0 transition-all duration-300 py-3 shadow-sm"
+        style={{ backgroundColor: 'rgb(247, 190, 57)' }}
+      >
+        <div className="mx-auto max-w-7xl px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="https://travplatforms.com/images/logo3.png" alt="TravPlatforms" style={{ height: '35px', objectFit: 'contain' }} />
+            <img 
+              src="https://travplatforms.com/images/logo3.png" 
+              alt="TravPlatforms" 
+              style={{ height: '35px', objectFit: 'contain' }} 
+            />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          
-      
-      {/* My Trips button */}
-<button
-  onClick={() => setShowTripsPage(true)}
-  style={{
-    background: '#fff',
-    border: 'none',
-    borderRadius: '10px',
-    padding: '7px 14px',
-    fontSize: '13px',
-    fontWeight: 700,
-    color: '#1a1a1a',
-    cursor: 'pointer',
-  }}
->
-  My Trips
-</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* My Trips button */}
+            <button
+              onClick={() => setShowTripsPage(true)}
+              className="group relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white text-gray-800 border border-black/5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <Icons.Map size={16} className="text-[#F7BE39] group-hover:scale-110 transition-transform" />
+              <span>My Trips</span>
+              {itineraries.length > 0 && (
+                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#F7BE39] text-[10px] text-gray-900 font-black shadow-sm">
+                  {itineraries.length}
+                </span>
+              )}
+            </button>
+            
             <HeaderProfileMenu
-  user={user}
-  onLogout={logout}
-  onOpenHRDashboard={onOpenHRDashboard}
-onOpenAdminDashboard={onOpenAdminDashboard}  
-  activeProfile={activeProfile}        // 'business' ya 'personal' — apna state manage karo
-  onSwitchProfile={(type) => setActiveProfile(type)}
-/>
-           
-          
+              user={user}
+              onLogout={logout}
+              onOpenHRDashboard={onOpenHRDashboard}
+              onOpenAdminDashboard={onOpenAdminDashboard}  
+              activeProfile={activeProfile}
+              onSwitchProfile={(type) => setActiveProfile(type)}
+            />
           </div>
         </div>
       </header>
 
       {/* ── HERO ── */}
       <div
-        className="relative w-full h-[320px] sm:h-[420px] md:h-[460px]"
-        style={{ backgroundImage: `url(${heroBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        className="relative w-full h-[300px] sm:h-[380px] md:h-[450px]"
+        style={{ 
+          backgroundImage: `url(${heroBg})`, 
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
       >
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.20) 45%, rgba(0,0,0,0.40) 100%)' }} />
-        <div className="absolute inset-x-0 top-0 flex flex-col items-center justify-center text-center px-4" style={{ height: '58%' }}>
-          <h1 className="text-white font-extrabold leading-tight mb-3"
-            style={{ fontSize: 'clamp(26px, 3.8vw, 50px)', textShadow: '0 2px 20px rgba(0,0,0,0.55)', fontFamily: "'Georgia', serif" }}>
-            Discover the World with Luxury
-          </h1>
-          <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}>
-            Experience premium travel at its finest.
-          </p>
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.5) 100%)' }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-white font-extrabold leading-tight mb-2 animate-fade-in-up"
+              style={{ fontSize: 'clamp(28px, 4vw, 52px)', textShadow: '0 4px 24px rgba(0,0,0,0.4)', fontFamily: "'Outfit', sans-serif" }}>
+              The Art of <span className="text-[#F7BE39]">Luxury</span> Travel
+            </h1>
+            <p className="max-w-xl mx-auto font-medium animate-fade-in-up delay-100" 
+               style={{ fontSize: 'clamp(14px, 1vw, 18px)', color: 'rgba(255,255,255,0.9)', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
+              Tailored itineraries and seamless planning.
+            </p>
+          </div>
         </div>
       </div>
 
       {/* ── SEARCH CARD ── */}
       <div
         className="relative mx-auto w-full px-4 sm:px-6"
-        style={{ maxWidth: '520px', marginTop: 'clamp(-26px, -5vw, -36px)', zIndex: 20 }}
+        style={{ maxWidth: '900px', marginTop: '-80px', zIndex: 40 }}
       >
-        <div className="bg-white rounded-2xl" style={{ padding: '18px 22px 22px', boxShadow: '0 8px 40px rgba(0,0,0,0.16)' }}>
+        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-[#F7BE39]/20">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-[#F7BE39]/10 flex items-center justify-center">
+                <Icons.MapPin size={18} className="text-[#F7BE39]" />
+              </span>
+              Plan Your Next Masterpiece
+            </h2>
+          </div>
           <RFQForm
             onSubmit={onSubmit}
             loading={loading}
@@ -308,7 +344,7 @@ onOpenAdminDashboard={onOpenAdminDashboard}
 
       {/* ── ITINERARIES ── */}
 {/* ── ITINERARIES ── */}
-      <main className="flex-1 bg-[#F9FAFB] mt-8">
+      <main className="flex-1 bg-white mt-8">
         {itineraries.length > 0 ? (
           <section className="mx-auto max-w-6xl px-4 sm:px-6 py-8" style={{ paddingBottom: '60px' }}>
 
@@ -321,7 +357,7 @@ onOpenAdminDashboard={onOpenAdminDashboard}
                   style={{
                     color: !showApprovals ? '#111827' : '#6b7280',
                     paddingBottom: '8px',
-                    borderBottom: !showApprovals ? '2px solid #9e8240' : '2px solid transparent',
+                    borderBottom: !showApprovals ? '3px solid #F7BE39' : '3px solid transparent',
                     transition: 'all 0.2s',
                   }}
                 >
@@ -339,7 +375,7 @@ onOpenAdminDashboard={onOpenAdminDashboard}
                       fontWeight: 700,
                       color: showApprovals ? '#111827' : '#6b7280',
                       paddingBottom: '8px',
-                      borderBottom: showApprovals ? '2px solid #9e8240' : '2px solid transparent',
+                      borderBottom: showApprovals ? '3px solid #F7BE39' : '3px solid transparent',
                       transition: 'all 0.2s',
                     }}
                   >

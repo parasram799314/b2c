@@ -40,7 +40,8 @@ export function AuthProvider({ children }) {
           const storedToken = localStorage.getItem('fb_token');
           if (storedToken) {
             try {
-              const res = await axios.get('/api/users/profile', {
+              // CHANGE: Use /sync (POST) instead of /profile (GET) to handle auto-creation for new SSO users
+              const res = await axios.post('/api/users/sync', {}, {
                 headers: { Authorization: `Bearer ${storedToken}` }
               });
               if (res.data?.success) {
