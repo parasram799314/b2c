@@ -349,6 +349,10 @@ router.post('/', verifyToken, async (req, res) => {
 
     await rfq.save();
     console.log(`[RFQ/Create] Success! Created trip ${rfq._id}`);
+    
+    // Broadcast update
+    broadcastUpdate(req, rfq._id, rfq);
+
     res.status(201).json({ success: true, data: rfq });
   } catch (error) {
     console.error('[RFQ/Create] Fatal Error:', error);

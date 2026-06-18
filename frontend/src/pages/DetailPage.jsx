@@ -1262,63 +1262,35 @@ useEffect(() => {
     return Array.isArray(initialRfq?.planItems) ? initialRfq.planItems : [];
   });
 
-  // Re-fetch latest data on mount to prevent stale state overwrites
+  // Sync internal planItems state when initialRfq prop changes (e.g. from Socket.io in App.jsx)
   useEffect(() => {
-    if (!initialRfq?._id) return;
-    const loadLatest = async () => {
-      try {
-        const res = await axios.get(`/api/rfqs/${initialRfq._id}`);
-        if (res.data?.success && res.data.data) {
-          const latest = res.data.data;
-          console.log(`[DetailPage] Re-fetched latest data for ${latest._id}. Items: ${latest.planItems?.length || 0}`);
-          
-          // Only update if backend is different to avoid overwriting local unsynced changes
-          setRfq(latest);
-          if (Array.isArray(latest.planItems)) {
-            // Simple check: if lengths are different, or we want to be sure, update.
-            // In a real app, we'd use timestamps or deep comparison.
-            setPlanItems(prev => {
-              if (JSON.stringify(prev) !== JSON.stringify(latest.planItems)) {
-                return latest.planItems;
-              }
-              return prev;
-            });
-          }
-          if (onUpdate) onUpdate(latest);
-        }
-      } catch (err) {
-        console.error("Failed to re-fetch rfq on mount:", err);
-      }
-    };
-    loadLatest();
-
-    // Collaboration Polling
-    const pollInterval = setInterval(loadLatest, 5000);
-    return () => clearInterval(pollInterval);
-  }, [initialRfq?._id]); // Only runs when trip ID changes
+    if (initialRfq?.planItems) {
+      console.log(`[DetailPage] Props update: syncing ${initialRfq.planItems.length} items`);
+      setPlanItems(initialRfq.planItems);
+      setRfq(initialRfq);
+    }
+  }, [initialRfq]);
 
   // Effect to sync planItems with backend (optional: debounce for performance)
   useEffect(() => {
     if (!rfq?._id || rfq.reviewStatus === 'approved') return;
     
-    // Using a timeout to debounce database updates
+    // Check if local state actually differs from what we think the server has
+    if (JSON.stringify(planItems) === JSON.stringify(rfq.planItems)) return;
+
     const timer = setTimeout(async () => {
       try {
         console.log(`[DetailPage] Syncing ${planItems.length} items to DB for RFQ ${rfq._id}`);
         const res = await axios.put(`/api/rfqs/${rfq._id}`, { planItems });
         if (res.data?.success && res.data.data) {
           const updatedRfq = res.data.data;
-          console.log(`[DetailPage] Sync successful. Updated RFQ has ${updatedRfq.planItems?.length || 0} items`);
           setRfq(updatedRfq);
-          if (onUpdate) {
-            console.log(`[DetailPage] Calling onUpdate with updated RFQ`);
-            onUpdate(updatedRfq);
-          }
+          if (onUpdate) onUpdate(updatedRfq);
         }
       } catch (err) {
         console.error("Failed to sync planItems to DB", err);
       }
-    }, 1000);
+    }, 800); // Slightly faster debounce
 
     return () => clearTimeout(timer);
   }, [planItems, rfq?._id, rfq.reviewStatus, onUpdate]);
