@@ -202,18 +202,22 @@ function AppInner() {
   const { user, authLoading } = useAuth();  // ← authLoading ADD KARO
   const [view, setView] = useState('app');
 
-  // ── SSO REDIRECTION LOGIC ──
+  // ── SSO REDIRECTION LOGIC (PART 1) ──
   useEffect(() => {
-    if (!authLoading && !user) {
-      const path = window.location.pathname;
-      if (path.startsWith('/join/')) {
+    const path = window.location.pathname;
+    if (path.startsWith('/join/')) {
+      const storedToken = localStorage.getItem('fb_token');
+      const hasUrlToken = window.location.href.includes('token=');
+
+      // If no token at all, redirect to B2B Login immediately
+      if (!storedToken && !hasUrlToken) {
         const currentUrl = window.location.href;
         const b2bLoginUrl = `https://b2b-backup.vercel.app/login?redirect=${encodeURIComponent(currentUrl)}`;
-        console.log('[App] Redirecting to B2B SSO:', b2bLoginUrl);
+        console.log('[App] Guest user on join route, redirecting to B2B SSO:', b2bLoginUrl);
         window.location.href = b2bLoginUrl;
       }
     }
-  }, [user, authLoading]);
+  }, []); // Run once on mount
 
   // ← YEH BLOCK ADD KARO — sabse pehle
   if (authLoading) {
@@ -234,6 +238,14 @@ function AppInner() {
   }
 
   if (!user) {
+    // If we're here and not loading, it means we don't have a valid session
+    // Redirect /join/ users who might have an expired token
+    const path = window.location.pathname;
+    if (path.startsWith('/join/')) {
+       window.location.href = `https://b2b-backup.vercel.app/login?redirect=${encodeURIComponent(window.location.href)}`;
+       return null;
+    }
+
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -14,30 +14,28 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check if there's a token in the URL (Session Sharing from Dashboard)
+    // 1. Check if there's a token in the URL (SSO from B2B)
     const currentHref = window.location.href;
-    let urlToken = null;
-    let cleanUrl = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    let urlToken = urlParams.get('token');
 
-    if (currentHref.includes('token=')) {
-      const parts = currentHref.split('token=');
-      urlToken = parts[1].split(/[?&]/)[0]; // Extract token and ignore other params
-      // Get the part before 'token=' and remove trailing ? or &
-      const baseUrlPart = parts[0].replace(/[?&]$/, '');
+    // Robust extraction if URLSearchParams fails (e.g. if token is after a hash or malformed)
+    if (!urlToken && currentHref.includes('token=')) {
       try {
-        const urlObj = new URL(baseUrlPart);
-        cleanUrl = urlObj.pathname;
+        urlToken = currentHref.split('token=')[1].split(/[?&]/)[0];
       } catch (e) {
-        cleanUrl = baseUrlPart.split(window.location.host).pop() || '/';
+        console.error('[Auth] Token extraction failed:', e);
       }
-    } else {
-      const params = new URLSearchParams(window.location.search);
-      urlToken = params.get('token');
     }
     
     if (urlToken) {
+      console.log('[Auth] New token detected in URL, saving...');
       localStorage.setItem('fb_token', urlToken);
-      // Clean URL to keep it pretty and prevent infinite loops
+      
+      // Clean URL: Remove ONLY the token while keeping the path (e.g. /join/ABC)
+      const url = new URL(window.location.href);
+      url.searchParams.delete('token');
+      const cleanUrl = url.pathname + url.search;
       window.history.replaceState({}, document.title, cleanUrl);
     }
 
