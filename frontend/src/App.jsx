@@ -208,7 +208,7 @@ function AppInner() {
       const path = window.location.pathname;
       if (path.startsWith('/join/')) {
         const currentUrl = window.location.href;
-        const b2bLoginUrl = `https://b2b-backup.vercel.app/loginredirect=${encodeURIComponent(currentUrl)}`;
+        const b2bLoginUrl = `https://b2b-backup.vercel.app/login?redirect=${encodeURIComponent(currentUrl)}`;
         console.log('[App] Redirecting to B2B SSO:', b2bLoginUrl);
         window.location.href = b2bLoginUrl;
       }
