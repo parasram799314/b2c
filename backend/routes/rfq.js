@@ -95,6 +95,16 @@ router.post('/join/:inviteCode', verifyToken, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+//  SOCKET BROADCAST HELPER
+// ════════════════════════════════════════════════════════════════════════════
+function broadcastUpdate(req, rfqId, data) {
+  if (req.io) {
+    req.io.to(String(rfqId)).emit('itinerary_updated', data);
+    console.log(`[Socket] Broadcasted update for trip: ${rfqId}`);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  UTILITY HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -652,6 +662,7 @@ router.patch('/:id/checklist', async (req, res) => {
         rfq.markModified('checklist');
         rfq.markModified('checklistStats');
         await rfq.save();
+        broadcastUpdate(req, rfq._id, rfq);
       }
     }
     res.json({ success: true, data: rfq });
@@ -789,6 +800,10 @@ router.put('/:id', async (req, res) => {
   try {
     const rfq = await RFQ.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!rfq) return res.status(404).json({ success: false, message: 'RFQ not found' });
+    
+    // Broadcast update
+    broadcastUpdate(req, rfq._id, rfq);
+    
     res.json({ success: true, data: rfq });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

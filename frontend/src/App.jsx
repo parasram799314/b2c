@@ -2,15 +2,18 @@ import { useState, useEffect } from 'react';
 import axios from './utils/axiosConfig';
 import HomePage from './pages/HomePage';
 import DetailPage from './pages/DetailPage';
-
-import './utils/axiosConfig'
+import { io } from 'socket.io-client';
 import HRDashboard from './pages/HRDashboard'
 import AdminDashboard from './pages/AdminDashboard';
+import './utils/axiosConfig'
 
 // ── Role Auth Imports ─────────────────────────────────────────
 import { AuthProvider, useAuth }   from './role-auth/role-auth/src/context/AuthContext';
 import { TripReviewProvider }      from './role-auth/role-auth/src/context/TripReviewContext';
 import ManagerPage                 from './role-auth/role-auth/src/pages/ManagerPage';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const socket = io(API_URL);
 
 // ─────────────────────────────────────────────────────────────
 //  Main App Logic (original — kuch nahi badla)
@@ -27,6 +30,32 @@ function UserApp({ onOpenHRDashboard, onOpenManagerPanel, onOpenAdminDashboard }
   const [undoVisible, setUndoVisible]   = useState(false);
 
   console.log('[App] Rendering with itineraries:', itineraries.map(r => ({_id: r._id, planItems: r.planItems?.length || 0})));
+
+  // ── SOCKET.IO REAL-TIME LISTENER ──
+  useEffect(() => {
+    if (!currentRfq?._id) return;
+
+    // Join the room for this specific trip
+    socket.emit('join_trip', currentRfq._id);
+    console.log(`[Socket] Joining trip room: ${currentRfq._id}`);
+
+    const handleUpdate = (updatedData) => {
+      console.log('[Socket] Received real-time update:', updatedData._id);
+      
+      // Update local state instantly
+      setItineraries(prev => prev.map(it => it._id === updatedData._id ? updatedData : it));
+      
+      if (currentRfq?._id === updatedData._id) {
+        setCurrentRfq(updatedData);
+      }
+    };
+
+    socket.on('itinerary_updated', handleUpdate);
+
+    return () => {
+      socket.off('itinerary_updated', handleUpdate);
+    };
+  }, [currentRfq?._id]);
 
 // ── JOIN TRIP HANDLER ──
 useEffect(() => {
