@@ -33,6 +33,11 @@ const fmtDateTime = (d) => {
   } catch { return d; }
 };
 
+const getInitials = (name) => {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+};
+
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 const MapPinIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -224,6 +229,20 @@ export default function TripDetailsModal({
 }) {
   if (!rfq) return null;
 
+  // ── Local Profile ──
+  const savedProfileStr = localStorage.getItem('tp_profile');
+  let localProfile = {};
+  if (savedProfileStr) {
+    try {
+      localProfile = JSON.parse(savedProfileStr);
+    } catch (e) {
+      console.error('Error parsing tp_profile in TripDetailsModal', e);
+    }
+  }
+
+  const travelerName = localProfile.fullName || rfq.travelerName || 'Trushant Shah';
+  const reviewerName = localProfile.reviewer || rfq.reviewer || 'Tushar Mehta';
+
   // ── Derived data ──
   const displayTripId =
     (rfq?.rfqId && String(rfq.rfqId).trim()) ||
@@ -242,7 +261,6 @@ export default function TripDetailsModal({
   const rfqTotalNights = destinations.reduce(
     (s, d) => s + (Number(d.nights || d.numberOfNights) || 0), 0,
   );
-  const totalPax = (rfq.numberOfAdults || 1) + (rfq.numberOfChildren || 0) + (rfq.numberOfInfants || 0);
 
   const flightTotal     = planItems.filter(p => p.type === 'flight'     && p.status !== 'cancelled').reduce((s, f) => s + (parseFloat(f.price) || 0), 0);
   const hotelTotal      = planItems.filter(p => p.type === 'hotel'      && p.status !== 'cancelled' && !p._isHotelContinuation).reduce((s, h) => s + (parseFloat(h.price || 0) * (Number(h.nights) || 1)), 0);
@@ -258,17 +276,94 @@ export default function TripDetailsModal({
     { name: 'Dubai, UAE',    date: '18 Feb — 21 Feb 2025', dot: '#1D9E75', transit: false },
   ];
 
-  // Participants
-  const participants = [
-    { initial: 'TS', name: rfq.travelerName || 'Trushant Shah', role: 'Trip organiser', permission: 'Admin',    avatarBg: '#AFA9EC', avatarColor: '#26215C', permBg: '#EEEDFE', permColor: '#3C3489' },
+  const COLORS = [
+    { avatarBg: '#AFA9EC', avatarColor: '#26215C', permBg: '#EEEDFE', permColor: '#3C3489' },
+    { avatarBg: '#85B7EB', avatarColor: '#042C53', permBg: '#E6F1FB', permColor: '#0C447C' },
+    { avatarBg: '#FAC775', avatarColor: '#412402', permBg: '#EAF3DE', permColor: '#27500A' },
+    { avatarBg: '#F87171', avatarColor: '#7F1D1D', permBg: '#FEE2E2', permColor: '#991B1B' },
+    { avatarBg: '#34D399', avatarColor: '#064E3B', permBg: '#D1FAE5', permColor: '#065F46' },
   ];
 
+  const getPermissionLabel = (collabRole) => {
+    if (collabRole === 'admin') return 'Admin';
+    if (collabRole === 'editor' || collabRole === 'Can edit') return 'Can edit';
+    if (collabRole === 'viewer' || collabRole === 'View only') return 'View only';
+    return 'Can edit';
+  };
+
+  const getRoleLabel = (collabRole, isFirst) => {
+    if (isFirst || collabRole === 'admin') return 'Trip organiser';
+    return 'Co-traveller';
+  };
+
+  // Resolve collaborators
+  let collaboratorsList = rfq.collaborators || [];
+  if (collaboratorsList.length === 0) {
+    collaboratorsList = [
+      {
+        name: travelerName,
+        email: rfq.travelerEmail || localProfile?.email || '',
+        role: 'admin'
+      }
+    ];
+  }
+
+  // Participants
+  const participants = collaboratorsList.map((c, i) => {
+    const isFirst = i === 0;
+    const permLabel = getPermissionLabel(c.role);
+    const colorTheme = COLORS[i % COLORS.length];
+
+    return {
+      initial: getInitials(c.name),
+      name: c.name,
+      role: getRoleLabel(c.role, isFirst),
+      permission: permLabel,
+      avatarBg: colorTheme.avatarBg,
+      avatarColor: colorTheme.avatarColor,
+      permBg: colorTheme.permBg,
+      permColor: colorTheme.permColor
+    };
+  });
+
   // Travellers
-  const travellers = rfq.travellers || [
-    { initial: 'TS', name: rfq.travelerName || 'Trushant Shah', passport: 'A1234567', dob: '14 Mar 1990', type: 'Adult', avatarBg: '#AFA9EC', avatarColor: '#26215C' },
-    { initial: 'RM', name: 'Rahul Mehta',   passport: 'B9876543', dob: '22 Jul 1988', type: 'Adult', avatarBg: '#85B7EB', avatarColor: '#042C53' },
-    { initial: 'PN', name: 'Priya Nair',    passport: '—',        dob: '05 Sep 2016', type: 'Child', avatarBg: '#FAC775', avatarColor: '#412402' },
-  ];
+  const travellers = collaboratorsList.map((c, i) => {
+    const isFirst = i === 0;
+    const colorTheme = COLORS[i % COLORS.length];
+    
+    let passport = '—';
+    if (isFirst) {
+      passport = localProfile?.passport || 'A1234567';
+    } else {
+      passport = `B987654${i}`;
+    }
+
+    let dob = '—';
+    if (isFirst) {
+      dob = '14 Mar 1990';
+    } else if (i === 1) {
+      dob = '22 Jul 1988';
+    } else {
+      dob = '05 Sep 2016';
+    }
+
+    let type = 'Adult';
+    if (i >= 2) {
+      type = 'Child';
+    }
+
+    return {
+      initial: getInitials(c.name),
+      name: c.name,
+      passport,
+      dob,
+      type,
+      avatarBg: colorTheme.avatarBg,
+      avatarColor: colorTheme.avatarColor
+    };
+  });
+
+  const totalPax = travellers.length;
 
   // Cost centres
   const costCentres = rfq.costCentres || [
@@ -299,7 +394,7 @@ export default function TripDetailsModal({
       dateSub: budgetApproved ? fmtDateTime(budgetApproved).split(', ').slice(-1)[0] : '10:30 pm',
       status: budgetApproved ? 'done' : 'active',
       comment: 'Looks good, approved for Dubai business trip.',
-      commenter: `${rfq.reviewer || 'Tushar Mehta'} · Manager`,
+      commenter: `${reviewerName} · Manager`,
     },
     {
       label: 'Trip plan submitted',
@@ -314,7 +409,7 @@ export default function TripDetailsModal({
       dateSub: planFrozen && tripApproved ? fmtDateTime(tripApproved).split(', ').slice(-1)[0] : null,
       status: planFrozen ? 'done' : 'not-yet',
       comment: planFrozen ? 'Proceed with the booking.' : null,
-      commenter: planFrozen ? `${rfq.reviewer || 'Tushar Mehta'} · Manager` : null,
+      commenter: planFrozen ? `${reviewerName} · Manager` : null,
     },
   ];
 
@@ -371,7 +466,7 @@ export default function TripDetailsModal({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Badge bg="#E6F1FB" color="#0C447C" border="transparent">
-              {rfq.travelerName || 'Trushant Shah'}
+              {travelerName}
             </Badge>
             <button
               onClick={onClose}
@@ -494,8 +589,8 @@ export default function TripDetailsModal({
                     { label: 'Transfers',   val: transferTotal   || 8600   },
                   ].map((row, i) => (
                     <div key={i} style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', color: '#6b7280' }}>{row.label}</span>
-                      <span style={{ fontSize: '13px', fontWeight: 500, color: '#111827' }}>{fmt(row.val)}</span>
+                       <span style={{ fontSize: '13px', color: '#6b7280' }}>{row.label}</span>
+                       <span style={{ fontSize: '13px', fontWeight: 500, color: '#111827' }}>{fmt(row.val)}</span>
                     </div>
                   ))}
                   <div style={{ borderTop: '0.5px solid #e5e7eb', paddingTop: '10px', marginTop: '4px' }}>
@@ -526,11 +621,7 @@ export default function TripDetailsModal({
               <div style={{ padding: '14px 18px' }}>
                 {/* Trip organiser + co-travellers */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
-                  {[
-                    { initial: 'TS', name: rfq.travelerName || 'Trushant Shah', role: 'Trip organiser', permission: 'Admin',    avatarBg: '#AFA9EC', avatarColor: '#26215C', permBg: '#EEEDFE', permColor: '#3C3489' },
-                    { initial: 'RM', name: 'Rahul Mehta',                       role: 'Co-traveller',  permission: 'Can edit',  avatarBg: '#85B7EB', avatarColor: '#042C53', permBg: '#E6F1FB', permColor: '#0C447C' },
-                    { initial: 'PN', name: 'Priya Nair',                        role: 'Co-traveller',  permission: 'View only', avatarBg: '#FAC775', avatarColor: '#412402', permBg: '#EAF3DE', permColor: '#27500A' },
-                  ].map((p, i) => (
+                  {participants.map((p, i) => (
                     <div key={i} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '10px 14px',
@@ -576,9 +667,9 @@ export default function TripDetailsModal({
                       background: '#AFA9EC', color: '#26215C',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '11px', fontWeight: 600,
-                    }}>TM</div>
+                    }}>{getInitials(reviewerName)}</div>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: '#111827' }}>
-                      {rfq.reviewer || 'Tushar Mehta'}
+                      {reviewerName}
                     </span>
                     <span style={{
                       background: planFrozen ? '#EAF3DE' : '#FAEEDA',
