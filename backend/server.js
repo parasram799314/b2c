@@ -9,6 +9,7 @@ import flightRoutes from './routes/flights.js';
 import budgetApprovalRoutes from './routes/budgetApprovals.js';
 import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
+import RFQ from './models/RFQ.js';
 
 dotenv.config();
 const app = express();
@@ -41,9 +42,58 @@ app.use((req, res, next) => {
 io.on('connection', (socket) => {
   console.log(`[Socket] User connected: ${socket.id}`);
   
-  socket.on('join_trip', (tripId) => {
+  socket.on('join_trip', async (tripId) => {
     socket.join(tripId);
     console.log(`[Socket] User ${socket.id} joined trip: ${tripId}`);
+    
+    // Send chat history
+    try {
+      const rfq = await RFQ.findById(tripId);
+      if (rfq && rfq.chatMessages) {
+        socket.emit('chat_history', {
+          tripId,
+          messages: rfq.chatMessages.map(m => ({
+            id: m._id,
+            userId: m.senderId,
+            userName: m.senderName,
+            text: m.text,
+            time: m.time,
+            type: 'text'
+          }))
+        });
+      }
+    } catch (err) {
+      console.error('[Socket] Get chat history error:', err);
+    }
+  });
+
+  socket.on('send_chat_message', async ({ tripId, message }) => {
+    try {
+      socket.to(tripId).emit('receive_chat_message', { tripId, message });
+      
+      await RFQ.findByIdAndUpdate(tripId, {
+        $push: {
+          chatMessages: {
+            senderId: message.userId,
+            senderName: message.userName,
+            text: message.text,
+            time: message.time,
+            timestamp: new Date()
+          }
+        }
+      });
+      console.log(`[Socket] Saved chat message in trip ${tripId} from ${message.userName}`);
+    } catch (err) {
+      console.error('[Socket] Save message error:', err);
+    }
+  });
+
+  socket.on('typing', ({ tripId, userId, userName, isTyping }) => {
+    socket.to(tripId).emit('typing', { userId, userName, isTyping });
+  });
+
+  socket.on('react_to_message', ({ tripId, msgId, userId, emoji }) => {
+    socket.to(tripId).emit('receive_reaction', { msgId, userId, emoji });
   });
 
   socket.on('disconnect', () => {

@@ -16,6 +16,7 @@ import PlanPanel, { BookView } from '../components/detail/PlanPanel';
 import PermissionAvatars from '../components/detail/headings/PermissionAvatars';
 import axios from '../utils/axiosConfig'; // ✅ Ye line add karo
 import TripVoucherModal from '../components/detail/headings/TripVoucherModal';
+import { io } from 'socket.io-client';
 import PlanCard, {
   ShieldEmpty,
   fmt,
@@ -1130,7 +1131,6 @@ const [tempTripName, setTempTripName] = useState(rfq?.tripName || '');
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
-
   // ── Homepage se profile name load karne ke liye ──
   useEffect(() => {
     const savedProfile = localStorage.getItem('tp_profile');
@@ -1155,6 +1155,74 @@ const [tempTripName, setTempTripName] = useState(rfq?.tripName || '');
   // ── Genie / Chat panel state ──
   const [chatOpen, setChatOpen] = useState(true);
   const [groupChatOpen, setGroupChatOpen] = useState(false);
+
+  const [socket, setSocket] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // ── SOCKET CHAT & NOTIFICATIONS ──
+  useEffect(() => {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const s = io(API_URL);
+    setSocket(s);
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    return () => {
+      s.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!socket || !rfq?._id) return;
+
+    socket.emit('join_trip', rfq._id);
+    console.log(`[Socket] DetailPage joined trip: ${rfq._id}`);
+
+    const handleReceiveMessage = ({ message }) => {
+      console.log('[Socket] Received chat message:', message);
+      
+      const savedProfile = localStorage.getItem('tp_profile');
+      let localName = '';
+      if (savedProfile) {
+        try {
+          localName = JSON.parse(savedProfile).fullName;
+        } catch(e) {}
+      }
+      const isOwn = message.userName === localName || message.userId === 'admin-user';
+
+      if (!isOwn) {
+        setToastMessage(message);
+        
+        if (Notification.permission === 'granted') {
+          new Notification(`New message from ${message.userName}`, {
+            body: message.text,
+            icon: '/favicon.ico'
+          });
+        }
+      }
+    };
+
+    socket.on('receive_chat_message', handleReceiveMessage);
+
+    return () => {
+      socket.off('receive_chat_message', handleReceiveMessage);
+    };
+  }, [socket, rfq?._id]);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  useEffect(() => {
+    if (groupChatOpen) {
+      setToastMessage(null);
+    }
+  }, [groupChatOpen]);
   // ── Responsive layout (mobile/tablet vs desktop) ──
   const [viewportW, setViewportW] = useState(() =>
     (typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -2153,9 +2221,68 @@ const grandTotal     = flightTotal + hotelTotal + transportTotal + otherTotal;
           </div>
         )}
       </div>
-            {/* ✅ YAHAN ADD KARO */}
+      {/* Real-time Message Notification Toast */}
+      {toastMessage && (
+        <div 
+          onClick={() => {
+            setGroupChatOpen(true);
+            setToastMessage(null);
+          }}
+          style={{
+            position: 'fixed', bottom: '24px', left: '24px', zIndex: 100001,
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px',
+            padding: '12px 16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            display: 'flex', alignItems: 'center', gap: '12px', width: '320px',
+            cursor: 'pointer', animation: 'toastSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1)'
+          }}
+        >
+          <style>{`
+            @keyframes toastSlideIn {
+              from { transform: translateY(20px) scale(0.95); opacity: 0; }
+              to { transform: translateY(0) scale(1); opacity: 1; }
+            }
+          `}</style>
+          {/* User Avatar */}
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'rgb(247,190,57)', color: '#1a1a1a', fontWeight: 800,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '14px', flexShrink: 0
+          }}>
+            {toastMessage.userName ? toastMessage.userName.charAt(0).toUpperCase() : '?'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#1f2937' }}>
+              {toastMessage.userName}
+            </div>
+            <div style={{
+              fontSize: '11px', color: '#4b5563', textOverflow: 'ellipsis',
+              overflow: 'hidden', whiteSpace: 'nowrap'
+            }}>
+              {toastMessage.text}
+            </div>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setToastMessage(null);
+            }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '16px', color: '#9ca3af', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px',
+              borderRadius: '50%'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {groupChatOpen && (
-        <GroupChatBox onClose={() => setGroupChatOpen(false)} />
+        <GroupChatBox rfq={rfq} socket={socket} onClose={() => setGroupChatOpen(false)} />
       )}
 
  {showAttachments && (

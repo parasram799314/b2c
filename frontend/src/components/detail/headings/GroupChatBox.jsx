@@ -1,21 +1,6 @@
 // components/detail/GroupChatBox.jsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-// ─── Dummy Users (same as PermissionAvatars) ─────────────────────────────────
-const CHAT_USERS = [
-  { id: 'T', name: 'Trushant Shah', permission: 'Admin',    avatarBg: '#8b5cf6', initial: 'T' },
-  { id: 'R', name: 'Rahul Mehta',   permission: 'Can Edit', avatarBg: '#0ea5e9', initial: 'R' },
-  { id: 'P', name: 'Priya Nair',    permission: 'View Only',avatarBg: '#f59e0b', initial: 'P' },
-];
-
-// ─── Mock initial messages ────────────────────────────────────────────────────
-const INITIAL_MESSAGES = [
-  { id: 1, userId: 'R', text: 'Hey team! I just reviewed the Dubai itinerary.', time: '10:02 AM', type: 'text' },
-  { id: 2, userId: 'P', text: 'Looks good! Should we add Burj Khalifa visit on Day 2?', time: '10:04 AM', type: 'text' },
-  { id: 3, userId: 'T', text: 'Yes, I already added it to the plan ✅', time: '10:06 AM', type: 'text' },
-  { id: 4, userId: 'R', text: 'Budget is a bit tight though — can we review hotel options?', time: '10:09 AM', type: 'text' },
-];
-
 // ─── Emoji Picker Data ────────────────────────────────────────────────────────
 const EMOJIS = ['👍','❤️','😂','😮','😢','🎉','✈️','🏨','🗺️','💰','👌','🔥'];
 
@@ -169,10 +154,9 @@ function MessageBubble({ msg, isOwn, user, showAvatar, onReact, reactions }) {
 }
 
 // ─── Main GroupChatBox ────────────────────────────────────────────────────────
-export default function GroupChatBox({ onClose }) {
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+export default function GroupChatBox({ rfq, socket, onClose }) {
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [activeUser] = useState(CHAT_USERS[0]); // Trushant = current user (Admin)
   const [typingUsers, setTypingUsers] = useState([]); // [{userId, name}]
   const [reactions, setReactions] = useState({}); // { msgId: [{userId, emoji}] }
   const [showOnline, setShowOnline] = useState(false);
@@ -184,7 +168,116 @@ export default function GroupChatBox({ onClose }) {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const typingTimerRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  const displayTripId = rfq?.rfqId || rfq?._id || 'demo-trip';
+
+  // Load local profile
+  const savedProfileStr = localStorage.getItem('tp_profile');
+  let localProfile = {};
+  if (savedProfileStr) {
+    try {
+      localProfile = JSON.parse(savedProfileStr);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  const COLORS = ['#8b5cf6', '#0ea5e9', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  // Derive Chat Users from RFQ Collaborators
+  const collaborators = rfq?.collaborators || [];
+  let chatUsers = collaborators.map((c, idx) => ({
+    id: c.uid || c.email || String(idx),
+    name: c.name,
+    permission: c.role === 'admin' ? 'Admin' : c.role === 'editor' ? 'Can Edit' : 'View Only',
+    avatarBg: COLORS[idx % COLORS.length],
+    initial: getInitials(c.name),
+    email: c.email
+  }));
+
+  if (chatUsers.length === 0) {
+    const fallbackName = rfq?.travelerName || localProfile?.fullName || 'Trushant Shah';
+    chatUsers = [
+      {
+        id: 'admin-user',
+        name: fallbackName,
+        permission: 'Admin',
+        avatarBg: '#8b5cf6',
+        initial: getInitials(fallbackName),
+        email: rfq?.travelerEmail || ''
+      }
+    ];
+  }
+
+  // Resolve current logged in sender
+  const localName = localProfile?.fullName || '';
+  const localEmail = localProfile?.email || '';
+  let activeUser = chatUsers.find(u => u.email === localEmail || u.name === localName);
+  if (!activeUser) {
+    activeUser = chatUsers[0];
+  }
+
+  // Listen to socket events
+  useEffect(() => {
+    if (!socket) return;
+
+    // Join room
+    socket.emit('join_trip', displayTripId);
+
+    const handleChatHistory = ({ messages: history }) => {
+      setMessages(history);
+    };
+
+    const handleReceiveMessage = ({ message }) => {
+      setMessages(prev => {
+        if (prev.find(m => m.id === message.id)) return prev;
+        return [...prev, message];
+      });
+
+      if (isMinimized) {
+        setUnread(prev => prev + 1);
+      }
+    };
+
+    const handleTyping = ({ userId, userName, isTyping }) => {
+      if (isTyping) {
+        setTypingUsers(prev => {
+          if (prev.find(u => u.userId === userId)) return prev;
+          return [...prev, { userId, name: userName }];
+        });
+      } else {
+        setTypingUsers(prev => prev.filter(u => u.userId !== userId));
+      }
+    };
+
+    const handleReceiveReaction = ({ msgId, userId, emoji }) => {
+      setReactions(prev => {
+        const existing = prev[msgId] || [];
+        const alreadyReacted = existing.find(r => r.userId === userId && r.emoji === emoji);
+        if (alreadyReacted) {
+          return { ...prev, [msgId]: existing.filter(r => !(r.userId === userId && r.emoji === emoji)) };
+        }
+        return { ...prev, [msgId]: [...existing, { userId, emoji }] };
+      });
+    };
+
+    socket.on('chat_history', handleChatHistory);
+    socket.on('receive_chat_message', handleReceiveMessage);
+    socket.on('typing', handleTyping);
+    socket.on('receive_reaction', handleReceiveReaction);
+
+    return () => {
+      socket.off('chat_history', handleChatHistory);
+      socket.off('receive_chat_message', handleReceiveMessage);
+      socket.off('typing', handleTyping);
+      socket.off('receive_reaction', handleReceiveReaction);
+    };
+  }, [socket, displayTripId, isMinimized]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -193,48 +286,37 @@ export default function GroupChatBox({ onClose }) {
     }
   }, [messages, isMinimized]);
 
-  // Simulate typing + auto-reply from Rahul after user sends message
-  const simulateReply = useCallback(() => {
-    const replier = CHAT_USERS[1]; // Rahul
-    setTypingUsers(prev => [...prev.filter(u => u.userId !== replier.id), { userId: replier.id, name: replier.name }]);
-
-    setTimeout(() => {
-      setTypingUsers(prev => prev.filter(u => u.userId !== replier.id));
-      const replies = [
-        "Got it! I'll check the flight options too.",
-        "Sounds like a great plan 🎉",
-        "Should we also book a desert safari?",
-        "Let me confirm with the client first.",
-        "Perfect, I'll update the itinerary.",
-      ];
-      const reply = replies[Math.floor(Math.random() * replies.length)];
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        userId: replier.id,
-        text: reply,
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        type: 'text',
-      }]);
-      setUnread(prev => isMinimized ? prev + 1 : 0);
-    }, 1800 + Math.random() * 1000);
-  }, [isMinimized]);
-
   const handleSend = useCallback(() => {
     const text = inputText.trim();
     if (!text) return;
 
     const newMsg = {
-      id: Date.now(),
+      id: String(Date.now()),
       userId: activeUser.id,
+      userName: activeUser.name,
       text,
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       type: 'text',
     };
+
     setMessages(prev => [...prev, newMsg]);
     setInputText('');
     setShowEmoji(false);
-    simulateReply();
-  }, [inputText, activeUser, simulateReply]);
+
+    // Emit via socket
+    if (socket) {
+      socket.emit('send_chat_message', { tripId: displayTripId, message: newMsg });
+      
+      // Stop typing indicator immediately
+      socket.emit('typing', {
+        tripId: displayTripId,
+        userId: activeUser.id,
+        userName: activeUser.name,
+        isTyping: false
+      });
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  }, [inputText, activeUser, displayTripId, socket]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -243,7 +325,41 @@ export default function GroupChatBox({ onClose }) {
     }
   };
 
+  const handleInputChange = (e) => {
+    setInputText(e.target.value);
+    
+    // Emit typing status
+    if (socket) {
+      socket.emit('typing', {
+        tripId: displayTripId,
+        userId: activeUser.id,
+        userName: activeUser.name,
+        isTyping: true
+      });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit('typing', {
+          tripId: displayTripId,
+          userId: activeUser.id,
+          userName: activeUser.name,
+          isTyping: false
+        });
+      }, 2000);
+    }
+  };
+
   const handleReact = (msgId, emoji) => {
+    if (socket) {
+      socket.emit('react_to_message', {
+        tripId: displayTripId,
+        msgId,
+        userId: activeUser.id,
+        emoji
+      });
+    }
+
     setReactions(prev => {
       const existing = prev[msgId] || [];
       const alreadyReacted = existing.find(r => r.userId === activeUser.id && r.emoji === emoji);
@@ -357,7 +473,7 @@ export default function GroupChatBox({ onClose }) {
             style={{ fontSize: '10px', fontWeight: 600, color: '#9ca3af', cursor: 'pointer' }}
             onClick={() => setShowOnline(v => !v)}
           >
-            {CHAT_USERS.length} members • <span style={{ color: '#16a34a' }}>3 online</span>
+            {chatUsers.length} members • <span style={{ color: '#16a34a' }}>{chatUsers.length} online</span>
           </div>
         </div>
 
@@ -414,7 +530,7 @@ export default function GroupChatBox({ onClose }) {
           padding: '10px 16px', flexShrink: 0,
           display: 'flex', gap: '10px', flexWrap: 'wrap',
         }}>
-          {CHAT_USERS.map(u => (
+          {chatUsers.map(u => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '22px', height: '22px', borderRadius: '50%',
@@ -471,8 +587,8 @@ export default function GroupChatBox({ onClose }) {
         </div>
 
         {filteredMessages.map((msg, idx) => {
-          const user = CHAT_USERS.find(u => u.id === msg.userId);
-          const isOwn = msg.userId === activeUser.id;
+          const user = chatUsers.find(u => u.id === msg.userId || u.name === msg.userName);
+          const isOwn = msg.userId === activeUser.id || msg.userName === activeUser.name;
           return (
             <MessageBubble
               key={msg.id}
@@ -491,12 +607,12 @@ export default function GroupChatBox({ onClose }) {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', marginBottom: '12px', padding: '0 4px' }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '50%',
-              background: CHAT_USERS.find(u => u.id === typingUsers[0].userId)?.avatarBg || '#8b5cf6',
+              background: chatUsers.find(u => u.id === typingUsers[0].userId)?.avatarBg || '#8b5cf6',
               color: '#fff', fontSize: '11px', fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
             }}>
-              {CHAT_USERS.find(u => u.id === typingUsers[0].userId)?.initial}
+              {chatUsers.find(u => u.id === typingUsers[0].userId)?.initial}
             </div>
             <div style={{
               background: '#fff', borderRadius: '18px 18px 18px 4px',
@@ -575,7 +691,7 @@ export default function GroupChatBox({ onClose }) {
               ref={inputRef}
               rows={1}
               value={inputText}
-              onChange={e => setInputText(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               className="chat-input"

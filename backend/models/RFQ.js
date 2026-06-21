@@ -196,6 +196,13 @@ const rfqSchema = new mongoose.Schema(
       joinedAt: { type: Date, default: Date.now }
     }],
     inviteCode: { type: String, unique: true, sparse: true },
+    chatMessages: [{
+      senderId:   { type: String },
+      senderName: { type: String },
+      text:       { type: String },
+      time:       { type: String },
+      timestamp:  { type: Date, default: Date.now }
+    }],
 
     createdBy:  { type: String, default: '' },
     assignedTo: { type: String, default: '' },
